@@ -71,12 +71,6 @@ data class StorageInfo(
 
 class MainActivity : ComponentActivity() {
 
-    /*
-     * O servidor agora pertence à Activity.
-     *
-     * O HttpServer precisa do Context para verificar
-     * se a rede ativa é realmente Wi-Fi.
-     */
     private val gtStoreHttpServer by lazy {
         HttpServer(
             applicationContext,
@@ -102,7 +96,26 @@ class MainActivity : ComponentActivity() {
                 } catch (_: Exception) {
                 }
 
+                /*
+                 * Mantemos o armazenamento original da Activity
+                 * para não quebrar a configuração já existente.
+                 */
                 getPreferences(MODE_PRIVATE)
+                    .edit()
+                    .putString(
+                        "pkg_folder_uri",
+                        uri.toString()
+                    )
+                    .apply()
+
+                /*
+                 * Também salvamos a mesma URI em uma preferência
+                 * compartilhada com o HttpServer.
+                 */
+                getSharedPreferences(
+                    "GTSTORE",
+                    MODE_PRIVATE
+                )
                     .edit()
                     .putString(
                         "pkg_folder_uri",
@@ -114,18 +127,57 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
+    override fun onCreate(
+        savedInstanceState: Bundle?
+    ) {
         super.onCreate(savedInstanceState)
 
-        val savedUri =
-            getPreferences(MODE_PRIVATE)
+        /*
+         * Primeiro tentamos recuperar a preferência compartilhada
+         * usada pelo servidor.
+         */
+        val sharedSavedUri =
+            getSharedPreferences(
+                "GTSTORE",
+                MODE_PRIVATE
+            )
                 .getString(
                     "pkg_folder_uri",
                     null
                 )
 
+        /*
+         * Se não existir, usamos a preferência antiga da Activity.
+         * Isso preserva uma pasta que já tenha sido selecionada
+         * antes desta alteração.
+         */
+        val savedUri =
+            sharedSavedUri
+                ?: getPreferences(MODE_PRIVATE)
+                    .getString(
+                        "pkg_folder_uri",
+                        null
+                    )
+
         if (!savedUri.isNullOrBlank()) {
-            selectedFolderUri = Uri.parse(savedUri)
+
+            selectedFolderUri =
+                Uri.parse(savedUri)
+
+            /*
+             * Garante que o HttpServer também tenha acesso
+             * à pasta recuperada de uma configuração antiga.
+             */
+            getSharedPreferences(
+                "GTSTORE",
+                MODE_PRIVATE
+            )
+                .edit()
+                .putString(
+                    "pkg_folder_uri",
+                    savedUri
+                )
+                .apply()
         }
 
         setContent {
@@ -133,18 +185,24 @@ class MainActivity : ComponentActivity() {
             GTStoreTheme {
 
                 GTStoreApp(
-                    selectedFolderUri = selectedFolderUri,
+                    selectedFolderUri =
+                        selectedFolderUri,
+
                     onSelectFolder = {
                         folderPicker.launch(null)
                     },
-                    httpServer = gtStoreHttpServer
+
+                    httpServer =
+                        gtStoreHttpServer
                 )
             }
         }
     }
 
     override fun onDestroy() {
+
         gtStoreHttpServer.stop()
+
         super.onDestroy()
     }
 }
@@ -188,8 +246,12 @@ fun GTStoreApp(
         GTStoreScreen.ARQUIVOS -> {
 
             FilesScreen(
-                selectedFolderUri = selectedFolderUri,
-                onSelectFolder = onSelectFolder,
+                selectedFolderUri =
+                    selectedFolderUri,
+
+                onSelectFolder =
+                    onSelectFolder,
+
                 onBack = {
                     currentScreen =
                         GTStoreScreen.DASHBOARD
@@ -221,6 +283,7 @@ fun GTStoreApp(
                         else ->
                             "GTSTORE"
                     },
+
                 onBack = {
                     currentScreen =
                         GTStoreScreen.DASHBOARD
@@ -258,6 +321,7 @@ fun Dashboard(
             Modifier
                 .fillMaxSize()
                 .padding(16.dp),
+
         verticalArrangement =
             Arrangement.spacedBy(12.dp)
     ) {
@@ -455,6 +519,7 @@ fun ServerScreen(
             Modifier
                 .fillMaxSize()
                 .padding(16.dp),
+
         verticalArrangement =
             Arrangement.spacedBy(12.dp)
     ) {
@@ -478,6 +543,7 @@ fun ServerScreen(
                 Column(
                     modifier =
                         Modifier.padding(16.dp),
+
                     verticalArrangement =
                         Arrangement.spacedBy(8.dp)
                 ) {
@@ -488,6 +554,7 @@ fun ServerScreen(
                                 "STATUS: ONLINE"
                             else
                                 "STATUS: OFFLINE",
+
                         style =
                             MaterialTheme.typography.titleLarge
                     )
@@ -548,6 +615,7 @@ fun ServerScreen(
                             status =
                                 httpServer.getStatus()
                         },
+
                         modifier =
                             Modifier.fillMaxWidth()
                     ) {
@@ -572,6 +640,7 @@ fun ServerScreen(
                             status =
                                 httpServer.getStatus()
                         },
+
                         modifier =
                             Modifier.fillMaxWidth()
                     ) {
@@ -583,6 +652,7 @@ fun ServerScreen(
 
                     Button(
                         onClick = onBack,
+
                         modifier =
                             Modifier.fillMaxWidth()
                     ) {
@@ -605,6 +675,7 @@ fun ServerScreen(
                 Column(
                     modifier =
                         Modifier.padding(16.dp),
+
                     verticalArrangement =
                         Arrangement.spacedBy(6.dp)
                 ) {
@@ -723,6 +794,7 @@ fun FilesScreen(
             PackageCatalog.synchronize(
                 context =
                     GTStoreApplication.context,
+
                 currentPackages =
                     catalogPackages
             )
@@ -769,6 +841,7 @@ fun FilesScreen(
             Modifier
                 .fillMaxSize()
                 .padding(16.dp),
+
         verticalArrangement =
             Arrangement.spacedBy(12.dp)
     ) {
@@ -792,6 +865,7 @@ fun FilesScreen(
                 Column(
                     modifier =
                         Modifier.padding(16.dp),
+
                     verticalArrangement =
                         Arrangement.spacedBy(6.dp)
                 ) {
@@ -921,6 +995,7 @@ fun FilesScreen(
                             onClick = {
                                 refreshCounter++
                             },
+
                             enabled =
                                 selectedFolderUri != null &&
                                     !scanning
@@ -957,6 +1032,7 @@ fun FilesScreen(
 
                     Button(
                         onClick = onBack,
+
                         modifier =
                             Modifier.fillMaxWidth()
                     ) {
@@ -975,16 +1051,20 @@ fun FilesScreen(
 
                 OutlinedTextField(
                     value = searchText,
+
                     onValueChange = {
                         searchText = it
                     },
+
                     modifier =
                         Modifier.fillMaxWidth(),
+
                     label = {
                         Text(
                             "Pesquisar PKG"
                         )
                     },
+
                     singleLine = true
                 )
             }
@@ -1010,6 +1090,7 @@ fun FilesScreen(
                             } else {
                                 "Nenhum PKG corresponde à pesquisa."
                             },
+
                         modifier =
                             Modifier.padding(16.dp)
                     )
@@ -1019,6 +1100,7 @@ fun FilesScreen(
 
         items(
             items = filteredPackages,
+
             key = {
                 it.id
             }
@@ -1277,6 +1359,7 @@ fun PackageCard(
         Column(
             modifier =
                 Modifier.padding(16.dp),
+
             verticalArrangement =
                 Arrangement.spacedBy(4.dp)
         ) {
@@ -1324,6 +1407,7 @@ fun StatusCard(
                 Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
+
             horizontalArrangement =
                 Arrangement.SpaceBetween
         ) {
@@ -1352,6 +1436,7 @@ fun SimpleScreen(
             Modifier
                 .fillMaxSize()
                 .padding(16.dp),
+
         verticalArrangement =
             Arrangement.spacedBy(16.dp)
     ) {
@@ -1369,6 +1454,7 @@ fun SimpleScreen(
 
         Button(
             onClick = onBack,
+
             modifier =
                 Modifier.fillMaxWidth()
         ) {
