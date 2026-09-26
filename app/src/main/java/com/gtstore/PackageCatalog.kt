@@ -25,24 +25,23 @@ object PackageCatalog {
         context: Context,
         packages: List<CatalogPackage>
     ) {
-
         val array = JSONArray()
 
         packages.forEach { pkg ->
 
-            val objectJson = JSONObject()
+            val item = JSONObject()
 
-            objectJson.put("id", pkg.id)
-            objectJson.put("name", pkg.name)
-            objectJson.put("file", pkg.file)
-            objectJson.put("path", pkg.path)
-            objectJson.put("size", pkg.size)
-            objectJson.put("modified", pkg.modified)
-            objectJson.put("type", pkg.type)
-            objectJson.put("version", pkg.version)
-            objectJson.put("description", pkg.description)
+            item.put("id", pkg.id)
+            item.put("name", pkg.name)
+            item.put("file", pkg.file)
+            item.put("path", pkg.path)
+            item.put("size", pkg.size)
+            item.put("modified", pkg.modified)
+            item.put("type", pkg.type)
+            item.put("version", pkg.version)
+            item.put("description", pkg.description)
 
-            array.put(objectJson)
+            array.put(item)
         }
 
         context
@@ -96,10 +95,12 @@ object PackageCatalog {
                                 "pkg"
                             ),
                             version = item.optString(
-                                "version"
+                                "version",
+                                ""
                             ),
                             description = item.optString(
-                                "description"
+                                "description",
+                                ""
                             )
                         )
                     )
@@ -112,3 +113,6 @@ object PackageCatalog {
         }
     }
 }
+
+
+
