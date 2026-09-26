@@ -2,8 +2,9 @@ package com.gtstore
 
 import java.io.BufferedReader
 import java.io.InputStreamReader
-import java.io.PrintWriter
+import java.io.OutputStream
 import java.net.Inet4Address
+import java.net.InetAddress
 import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.net.Socket
@@ -27,11 +28,9 @@ class HttpServer(
     private var serverSocket: ServerSocket? = null
     private var serverThread: Thread? = null
 
-    private val running =
-        AtomicBoolean(false)
+    private val running = AtomicBoolean(false)
 
-    private val activeConnections =
-        AtomicInteger(0)
+    private val activeConnections = AtomicInteger(0)
 
     fun start(): Boolean {
 
@@ -41,49 +40,60 @@ class HttpServer(
 
         return try {
 
-            val socket =
-                ServerSocket(port)
+            val socket = ServerSocket(
+                port,
+                50,
+                InetAddress.getByName("0.0.0.0")
+            )
+
+            socket.reuseAddress = true
 
             serverSocket = socket
 
             running.set(true)
 
-            serverThread =
-                Thread {
+            serverThread = Thread {
 
-                    while (running.get()) {
+                while (running.get()) {
 
-                        try {
+                    try {
 
-                            val client =
-                                socket.accept()
+                        val client = socket.accept()
 
-                            activeConnections.incrementAndGet()
+                        activeConnections.incrementAndGet()
 
-                            Thread {
+                        Thread {
 
-                                handleClient(client)
+                            handleClient(client)
 
-                            }.start()
+                        }.apply {
 
-                        } catch (_: Exception) {
+                            name = "GTSTORE-HTTP-CLIENT"
 
-                            if (running.get()) {
-                                // Erro durante accept.
-                            }
+                            start()
+                        }
+
+                    } catch (_: Exception) {
+
+                        if (running.get()) {
+                            // Falha durante accept.
                         }
                     }
-                }.apply {
-
-                    name = "GTSTORE-HTTP-SERVER"
-                    start()
                 }
+
+            }.apply {
+
+                name = "GTSTORE-HTTP-SERVER"
+
+                start()
+            }
 
             true
 
         } catch (_: Exception) {
 
             running.set(false)
+
             serverSocket = null
 
             false
@@ -100,6 +110,12 @@ class HttpServer(
         }
 
         serverSocket = null
+
+        try {
+            serverThread?.interrupt()
+        } catch (_: Exception) {
+        }
+
         serverThread = null
 
         activeConnections.set(0)
@@ -115,8 +131,7 @@ class HttpServer(
             running = running.get(),
             port = port,
             localAddress = getLocalIpAddress(),
-            activeConnections =
-                activeConnections.get()
+            activeConnections = activeConnections.get()
         )
     }
 
@@ -128,7 +143,7 @@ class HttpServer(
 
             socket.use {
 
-                socket.soTimeout = 10000
+                socket.soTimeout = 15000
 
                 val reader =
                     BufferedReader(
@@ -136,12 +151,6 @@ class HttpServer(
                             socket.getInputStream(),
                             StandardCharsets.UTF_8
                         )
-                    )
-
-                val writer =
-                    PrintWriter(
-                        socket.getOutputStream(),
-                        true
                     )
 
                 val requestLine =
@@ -167,218 +176,3 @@ class HttpServer(
                         ?: ""
 
                 val path =
-                    parts.getOrNull(1)
-                        ?: "/"
-
-                when {
-
-                    method != "GET" -> {
-
-                        sendResponse(
-                            writer = writer,
-                            status = "405 Method Not Allowed",
-                            contentType =
-                                "text/plain; charset=utf-8",
-                            body =
-                                "Método não permitido."
-                        )
-                    }
-
-                    path == "/" -> {
-
-                        sendResponse(
-                            writer = writer,
-                            status = "200 OK",
-                            contentType =
-                                "text/html; charset=utf-8",
-                            body =
-                                buildHomePage()
-                        )
-                    }
-
-                    path == "/api/status" -> {
-
-                        sendResponse(
-                            writer = writer,
-                            status = "200 OK",
-                            contentType =
-                                "application/json; charset=utf-8",
-                            body =
-                                buildStatusJson()
-                        )
-                    }
-
-                    path == "/favicon.ico" -> {
-
-                        sendResponse(
-                            writer = writer,
-                            status = "204 No Content",
-                            contentType =
-                                "text/plain",
-                            body = ""
-                        )
-                    }
-
-                    else -> {
-
-                        sendResponse(
-                            writer = writer,
-                            status = "404 Not Found",
-                            contentType =
-                                "text/plain; charset=utf-8",
-                            body =
-                                "GTSTORE: página não encontrada."
-                        )
-                    }
-                }
-            }
-
-        } catch (_: Exception) {
-
-        } finally {
-
-            activeConnections.decrementAndGet()
-
-            if (
-                activeConnections.get() < 0
-            ) {
-                activeConnections.set(0)
-            }
-        }
-    }
-
-    private fun sendResponse(
-        writer: PrintWriter,
-        status: String,
-        contentType: String,
-        body: String
-    ) {
-
-        val bodyBytes =
-            body.toByteArray(
-                StandardCharsets.UTF_8
-            )
-
-        writer.print(
-            "HTTP/1.1 $status\r\n"
-        )
-
-        writer.print(
-            "Content-Type: $contentType\r\n"
-        )
-
-        writer.print(
-            "Content-Length: ${bodyBytes.size}\r\n"
-        )
-
-        writer.print(
-            "Connection: close\r\n"
-        )
-
-        writer.print(
-            "Cache-Control: no-store\r\n"
-        )
-
-        writer.print(
-            "\r\n"
-        )
-
-        writer.print(body)
-
-        writer.flush()
-    }
-
-    private fun buildHomePage(): String {
-
-        val ip =
-            getLocalIpAddress()
-
-        return """
-            <!DOCTYPE html>
-            <html lang="pt-BR">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport"
-                    content="width=device-width, initial-scale=1.0">
-                <title>GTSTORE</title>
-            </head>
-            <body>
-                <h1>GTSTORE</h1>
-
-                <p>Servidor HTTP funcionando.</p>
-
-                <p>
-                    Endereço:
-                    http://$ip:$port
-                </p>
-
-                <p>
-                    <a href="/api/status">
-                        Ver status da API
-                    </a>
-                </p>
-            </body>
-            </html>
-        """.trimIndent()
-    }
-
-    private fun buildStatusJson(): String {
-
-        val connections =
-            activeConnections.get()
-
-        return """
-            {
-                "server": "GTSTORE",
-                "running": ${running.get()},
-                "port": $port,
-                "local_address": "${getLocalIpAddress()}",
-                "active_connections": $connections
-            }
-        """.trimIndent()
-    }
-
-    private fun getLocalIpAddress(): String {
-
-        return try {
-
-            val interfaces =
-                Collections.list(
-                    NetworkInterface.getNetworkInterfaces()
-                )
-
-            for (networkInterface in interfaces) {
-
-                if (
-                    !networkInterface.isUp ||
-                    networkInterface.isLoopback
-                ) {
-                    continue
-                }
-
-                val addresses =
-                    Collections.list(
-                        networkInterface.inetAddresses
-                    )
-
-                for (address in addresses) {
-
-                    if (
-                        address is Inet4Address &&
-                        !address.isLoopbackAddress
-                    ) {
-
-                        return address.hostAddress
-                            ?: "0.0.0.0"
-                    }
-                }
-            }
-
-            "0.0.0.0"
-
-        } catch (_: SocketException) {
-
-            "0.0.0.0"
-        }
-    }
-}
