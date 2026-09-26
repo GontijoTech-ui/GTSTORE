@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
 import com.gtstore.ui.theme.GTStoreTheme
+import kotlinx.coroutines.delay
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -68,8 +69,7 @@ data class StorageInfo(
     val free: Long
 )
 
-private val gtStoreHttpServer =
-    HttpServer(8080)
+private val gtStoreHttpServer = HttpServer(8080)
 
 class MainActivity : ComponentActivity() {
 
@@ -83,13 +83,11 @@ class MainActivity : ComponentActivity() {
             if (uri != null) {
 
                 try {
-
                     contentResolver.takePersistableUriPermission(
                         uri,
                         Intent.FLAG_GRANT_READ_URI_PERMISSION or
                             Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                     )
-
                 } catch (_: Exception) {
                 }
 
@@ -105,13 +103,8 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-    override fun onCreate(
-        savedInstanceState: Bundle?
-    ) {
-
-        super.onCreate(
-            savedInstanceState
-        )
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
 
         val savedUri =
             getPreferences(MODE_PRIVATE)
@@ -121,9 +114,7 @@ class MainActivity : ComponentActivity() {
                 )
 
         if (!savedUri.isNullOrBlank()) {
-
-            selectedFolderUri =
-                Uri.parse(savedUri)
+            selectedFolderUri = Uri.parse(savedUri)
         }
 
         setContent {
@@ -131,9 +122,7 @@ class MainActivity : ComponentActivity() {
             GTStoreTheme {
 
                 GTStoreApp(
-                    selectedFolderUri =
-                        selectedFolderUri,
-
+                    selectedFolderUri = selectedFolderUri,
                     onSelectFolder = {
                         folderPicker.launch(null)
                     }
@@ -143,18 +132,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-
-        super.onDestroy()
-
-        /*
-         * Nesta primeira versão,
-         * o servidor é encerrado quando
-         * a Activity é destruída.
-         *
-         * Futuramente ele será transferido
-         * para um Foreground Service.
-         */
         gtStoreHttpServer.stop()
+        super.onDestroy()
     }
 }
 
@@ -194,12 +173,8 @@ fun GTStoreApp(
         GTStoreScreen.ARQUIVOS -> {
 
             FilesScreen(
-                selectedFolderUri =
-                    selectedFolderUri,
-
-                onSelectFolder =
-                    onSelectFolder,
-
+                selectedFolderUri = selectedFolderUri,
+                onSelectFolder = onSelectFolder,
                 onBack = {
                     currentScreen =
                         GTStoreScreen.DASHBOARD
@@ -231,7 +206,6 @@ fun GTStoreApp(
                         else ->
                             "GTSTORE"
                     },
-
                 onBack = {
                     currentScreen =
                         GTStoreScreen.DASHBOARD
@@ -252,18 +226,14 @@ fun Dashboard(
         )
     }
 
-    LaunchedEffect(
-        Unit
-    ) {
+    LaunchedEffect(Unit) {
 
         while (true) {
 
             serverRunning =
                 gtStoreHttpServer.isRunning()
 
-            kotlinx.coroutines.delay(
-                1000
-            )
+            delay(1000)
         }
     }
 
@@ -272,7 +242,6 @@ fun Dashboard(
             Modifier
                 .fillMaxSize()
                 .padding(16.dp),
-
         verticalArrangement =
             Arrangement.spacedBy(12.dp)
     ) {
@@ -342,10 +311,7 @@ fun Dashboard(
                 modifier =
                     Modifier.fillMaxWidth()
             ) {
-
-                Text(
-                    "SERVIDOR"
-                )
+                Text("SERVIDOR")
             }
         }
 
@@ -360,10 +326,7 @@ fun Dashboard(
                 modifier =
                     Modifier.fillMaxWidth()
             ) {
-
-                Text(
-                    "ARQUIVOS"
-                )
+                Text("ARQUIVOS")
             }
         }
 
@@ -378,10 +341,7 @@ fun Dashboard(
                 modifier =
                     Modifier.fillMaxWidth()
             ) {
-
-                Text(
-                    "CLOUDFLARE"
-                )
+                Text("CLOUDFLARE")
             }
         }
 
@@ -396,10 +356,7 @@ fun Dashboard(
                 modifier =
                     Modifier.fillMaxWidth()
             ) {
-
-                Text(
-                    "GITHUB"
-                )
+                Text("GITHUB")
             }
         }
 
@@ -414,10 +371,7 @@ fun Dashboard(
                 modifier =
                     Modifier.fillMaxWidth()
             ) {
-
-                Text(
-                    "DOWNLOADS"
-                )
+                Text("DOWNLOADS")
             }
         }
 
@@ -432,10 +386,7 @@ fun Dashboard(
                 modifier =
                     Modifier.fillMaxWidth()
             ) {
-
-                Text(
-                    "CONFIGURAÇÕES"
-                )
+                Text("CONFIGURAÇÕES")
             }
         }
 
@@ -450,10 +401,7 @@ fun Dashboard(
                 modifier =
                     Modifier.fillMaxWidth()
             ) {
-
-                Text(
-                    "LOGS"
-                )
+                Text("LOGS")
             }
         }
     }
@@ -474,30 +422,14 @@ fun ServerScreen(
         mutableStateOf("")
     }
 
-    var refreshCounter by remember {
-        mutableIntStateOf(0)
-    }
-
-    LaunchedEffect(
-        refreshCounter
-    ) {
-
-        status =
-            gtStoreHttpServer.getStatus()
-    }
-
-    LaunchedEffect(
-        Unit
-    ) {
+    LaunchedEffect(Unit) {
 
         while (true) {
 
             status =
                 gtStoreHttpServer.getStatus()
 
-            kotlinx.coroutines.delay(
-                1000
-            )
+            delay(1000)
         }
     }
 
@@ -506,7 +438,6 @@ fun ServerScreen(
             Modifier
                 .fillMaxSize()
                 .padding(16.dp),
-
         verticalArrangement =
             Arrangement.spacedBy(12.dp)
     ) {
@@ -530,7 +461,6 @@ fun ServerScreen(
                 Column(
                     modifier =
                         Modifier.padding(16.dp),
-
                     verticalArrangement =
                         Arrangement.spacedBy(8.dp)
                 ) {
@@ -541,7 +471,6 @@ fun ServerScreen(
                                 "STATUS: ONLINE"
                             else
                                 "STATUS: OFFLINE",
-
                         style =
                             MaterialTheme.typography.titleLarge
                     )
@@ -578,8 +507,7 @@ fun ServerScreen(
                         onClick = {
 
                             if (
-                                gtStoreHttpServer
-                                    .isRunning()
+                                gtStoreHttpServer.isRunning()
                             ) {
 
                                 gtStoreHttpServer.stop()
@@ -590,20 +518,16 @@ fun ServerScreen(
                             } else {
 
                                 val started =
-                                    gtStoreHttpServer
-                                        .start()
+                                    gtStoreHttpServer.start()
 
                                 message =
-                                    if (started)
+                                    if (started) {
                                         "Servidor iniciado."
-                                    else
+                                    } else {
                                         "Não foi possível iniciar o servidor. A porta pode estar ocupada."
-
+                                    }
                             }
-
-                            refreshCounter++
                         },
-
                         modifier =
                             Modifier.fillMaxWidth()
                     ) {
@@ -625,13 +549,9 @@ fun ServerScreen(
 
                     Button(
                         onClick = {
-
                             status =
-                                gtStoreHttpServer
-                                    .getStatus()
-
+                                gtStoreHttpServer.getStatus()
                         },
-
                         modifier =
                             Modifier.fillMaxWidth()
                     ) {
@@ -643,7 +563,6 @@ fun ServerScreen(
 
                     Button(
                         onClick = onBack,
-
                         modifier =
                             Modifier.fillMaxWidth()
                     ) {
@@ -666,7 +585,6 @@ fun ServerScreen(
                 Column(
                     modifier =
                         Modifier.padding(16.dp),
-
                     verticalArrangement =
                         Arrangement.spacedBy(6.dp)
                 ) {
@@ -785,7 +703,6 @@ fun FilesScreen(
             PackageCatalog.synchronize(
                 context =
                     GTStoreApplication.context,
-
                 currentPackages =
                     catalogPackages
             )
@@ -832,7 +749,6 @@ fun FilesScreen(
             Modifier
                 .fillMaxSize()
                 .padding(16.dp),
-
         verticalArrangement =
             Arrangement.spacedBy(12.dp)
     ) {
@@ -856,7 +772,6 @@ fun FilesScreen(
                 Column(
                     modifier =
                         Modifier.padding(16.dp),
-
                     verticalArrangement =
                         Arrangement.spacedBy(6.dp)
                 ) {
@@ -867,9 +782,7 @@ fun FilesScreen(
                             MaterialTheme.typography.titleLarge
                     )
 
-                    if (
-                        selectedFolderUri == null
-                    ) {
+                    if (selectedFolderUri == null) {
 
                         Text(
                             text =
@@ -918,9 +831,7 @@ fun FilesScreen(
                                 "PKGs encontrados: ${packages.size}"
                         )
 
-                        if (
-                            lastScan.isNotBlank()
-                        ) {
+                        if (lastScan.isNotBlank()) {
 
                             Text(
                                 text =
@@ -990,7 +901,6 @@ fun FilesScreen(
                             onClick = {
                                 refreshCounter++
                             },
-
                             enabled =
                                 selectedFolderUri != null &&
                                     !scanning
@@ -1027,7 +937,6 @@ fun FilesScreen(
 
                     Button(
                         onClick = onBack,
-
                         modifier =
                             Modifier.fillMaxWidth()
                     ) {
@@ -1040,28 +949,22 @@ fun FilesScreen(
             }
         }
 
-        if (
-            selectedFolderUri != null
-        ) {
+        if (selectedFolderUri != null) {
 
             item {
 
                 OutlinedTextField(
                     value = searchText,
-
                     onValueChange = {
                         searchText = it
                     },
-
                     modifier =
                         Modifier.fillMaxWidth(),
-
                     label = {
                         Text(
                             "Pesquisar PKG"
                         )
                     },
-
                     singleLine = true
                 )
             }
@@ -1082,11 +985,11 @@ fun FilesScreen(
 
                     Text(
                         text =
-                            if (searchText.isBlank())
+                            if (searchText.isBlank()) {
                                 "Nenhum arquivo .pkg encontrado."
-                            else
-                                "Nenhum PKG corresponde à pesquisa.",
-
+                            } else {
+                                "Nenhum PKG corresponde à pesquisa."
+                            },
                         modifier =
                             Modifier.padding(16.dp)
                     )
@@ -1095,9 +998,7 @@ fun FilesScreen(
         }
 
         items(
-            items =
-                filteredPackages,
-
+            items = filteredPackages,
             key = {
                 it.id
             }
@@ -1177,10 +1078,12 @@ fun scanDocumentTree(
             val size =
                 file.length()
 
+            val path =
+                file.uri.toString()
+
             val id =
                 buildPackageId(
-                    path =
-                        file.uri.toString()
+                    path
                 )
 
             result.add(
@@ -1188,8 +1091,7 @@ fun scanDocumentTree(
                     id = id,
                     name = fileName,
                     file = fileName,
-                    path =
-                        file.uri.toString(),
+                    path = path,
                     sizeBytes = size,
                     size =
                         formatFileSize(size),
@@ -1225,8 +1127,7 @@ fun buildPackageId(
 
     } catch (_: Exception) {
 
-        path.hashCode()
-            .toString()
+        path.hashCode().toString()
     }
 }
 
@@ -1238,7 +1139,9 @@ fun getStorageInfo(
 
         val volumeName =
             android.provider.DocumentsContract
-                .getTreeDocumentId(folderUri)
+                .getTreeDocumentId(
+                    folderUri
+                )
                 ?.substringBefore(":")
 
         val path =
@@ -1292,7 +1195,6 @@ fun formatFileSize(
 ): String {
 
     if (bytes < 1024) {
-
         return "$bytes B"
     }
 
@@ -1355,7 +1257,6 @@ fun PackageCard(
         Column(
             modifier =
                 Modifier.padding(16.dp),
-
             verticalArrangement =
                 Arrangement.spacedBy(4.dp)
         ) {
@@ -1371,10 +1272,90 @@ fun PackageCard(
                     "Tamanho: ${pkg.size}"
             )
 
-            if (
-                pkg.version.isNotBlank()
-            ) {
+            if (pkg.version.isNotBlank()) {
 
                 Text(
                     text =
-                        "
+                        "Versão: ${pkg.version}"
+                )
+            }
+
+            Text(
+                text =
+                    "Tipo: PKG"
+            )
+        }
+    }
+}
+
+@Composable
+fun StatusCard(
+    title: String,
+    status: String
+) {
+
+    Card(
+        modifier =
+            Modifier.fillMaxWidth()
+    ) {
+
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            horizontalArrangement =
+                Arrangement.SpaceBetween
+        ) {
+
+            Text(
+                text = title,
+                style =
+                    MaterialTheme.typography.titleMedium
+            )
+
+            Text(
+                text = status
+            )
+        }
+    }
+}
+
+@Composable
+fun SimpleScreen(
+    title: String,
+    onBack: () -> Unit
+) {
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+        verticalArrangement =
+            Arrangement.spacedBy(16.dp)
+    ) {
+
+        Text(
+            text = title,
+            style =
+                MaterialTheme.typography.headlineMedium
+        )
+
+        Text(
+            text =
+                "Módulo em desenvolvimento."
+        )
+
+        Button(
+            onClick = onBack,
+            modifier =
+                Modifier.fillMaxWidth()
+        ) {
+
+            Text(
+                "VOLTAR"
+            )
+        }
+    }
+}
