@@ -531,6 +531,25 @@ class HttpServer(
         """.trimIndent()
     }
 
+    private fun buildStatusJson(): String {
+
+    val ip =
+        getWifiIpv4Address()
+            ?.hostAddress
+            ?: "SEM WI-FI"
+
+    return """
+        {
+            "server": "GTSTORE",
+            "running": ${running.get()},
+            "port": $port,
+            "local_address": "$ip",
+            "network": "WIFI",
+            "active_connections": ${activeConnections.get()}
+        }
+    """.trimIndent()
+    }
+    
     private fun buildPs4TestPage(): String {
 
     return """
