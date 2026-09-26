@@ -11,13 +11,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -33,6 +41,12 @@ enum class GTStoreScreen {
     CONFIGURACOES,
     LOGS
 }
+
+data class PackageItem(
+    val name: String,
+    val size: String,
+    val version: String
+)
 
 class MainActivity : ComponentActivity() {
 
@@ -67,67 +81,48 @@ fun GTStoreApp() {
                 )
             }
 
-            GTStoreScreen.SERVIDOR -> {
-                SimpleScreen(
-                    title = "SERVIDOR",
+            GTStoreScreen.ARQUIVOS -> {
+                FilesScreen(
                     onBack = {
                         currentScreen = GTStoreScreen.DASHBOARD
                     }
                 )
             }
 
-            GTStoreScreen.ARQUIVOS -> {
-                SimpleScreen(
-                    title = "ARQUIVOS",
-                    onBack = {
-                        currentScreen = GTStoreScreen.DASHBOARD
-                    }
-                )
+            GTStoreScreen.SERVIDOR -> {
+                SimpleScreen("SERVIDOR") {
+                    currentScreen = GTStoreScreen.DASHBOARD
+                }
             }
 
             GTStoreScreen.CLOUDFLARE -> {
-                SimpleScreen(
-                    title = "CLOUDFLARE",
-                    onBack = {
-                        currentScreen = GTStoreScreen.DASHBOARD
-                    }
-                )
+                SimpleScreen("CLOUDFLARE") {
+                    currentScreen = GTStoreScreen.DASHBOARD
+                }
             }
 
             GTStoreScreen.GITHUB -> {
-                SimpleScreen(
-                    title = "GITHUB",
-                    onBack = {
-                        currentScreen = GTStoreScreen.DASHBOARD
-                    }
-                )
+                SimpleScreen("GITHUB") {
+                    currentScreen = GTStoreScreen.DASHBOARD
+                }
             }
 
             GTStoreScreen.DOWNLOADS -> {
-                SimpleScreen(
-                    title = "DOWNLOADS",
-                    onBack = {
-                        currentScreen = GTStoreScreen.DASHBOARD
-                    }
-                )
+                SimpleScreen("DOWNLOADS") {
+                    currentScreen = GTStoreScreen.DASHBOARD
+                }
             }
 
             GTStoreScreen.CONFIGURACOES -> {
-                SimpleScreen(
-                    title = "CONFIGURAÇÕES",
-                    onBack = {
-                        currentScreen = GTStoreScreen.DASHBOARD
-                    }
-                )
+                SimpleScreen("CONFIGURAÇÕES") {
+                    currentScreen = GTStoreScreen.DASHBOARD
+                }
             }
 
             GTStoreScreen.LOGS -> {
-                SimpleScreen(
-                    title = "LOGS",
-                    onBack = {
-                        currentScreen = GTStoreScreen.DASHBOARD
-                    }
-                )
+                SimpleScreen("LOGS") {
+                    currentScreen = GTStoreScreen.DASHBOARD
+                }
             }
         }
     }
@@ -209,24 +204,15 @@ fun Dashboard(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        StatusCard(
-            title = "HD",
-            status = "● CONECTADO"
-        )
+        StatusCard("HD", "● CONECTADO")
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        StatusCard(
-            title = "CLOUDFLARE",
-            status = "● CONECTADO"
-        )
+        StatusCard("CLOUDFLARE", "● CONECTADO")
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        StatusCard(
-            title = "GITHUB",
-            status = "● SINCRONIZADO"
-        )
+        StatusCard("GITHUB", "● SINCRONIZADO")
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -237,177 +223,13 @@ fun Dashboard(
 
             DashboardButton(
                 text = "SERVIDOR",
-                modifier = Modifier.weight(1f),
-                onClick = {
-                    onNavigate(GTStoreScreen.SERVIDOR)
-                }
-            )
+                modifier = Modifier.weight(1f)
+            ) {
+                onNavigate(GTStoreScreen.SERVIDOR)
+            }
 
             DashboardButton(
                 text = "ARQUIVOS",
-                modifier = Modifier.weight(1f),
-                onClick = {
-                    onNavigate(GTStoreScreen.ARQUIVOS)
-                }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-
-            DashboardButton(
-                text = "CLOUDFLARE",
-                modifier = Modifier.weight(1f),
-                onClick = {
-                    onNavigate(GTStoreScreen.CLOUDFLARE)
-                }
-            )
-
-            DashboardButton(
-                text = "GITHUB",
-                modifier = Modifier.weight(1f),
-                onClick = {
-                    onNavigate(GTStoreScreen.GITHUB)
-                }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-
-            DashboardButton(
-                text = "DOWNLOADS",
-                modifier = Modifier.weight(1f),
-                onClick = {
-                    onNavigate(GTStoreScreen.DOWNLOADS)
-                }
-            )
-
-            DashboardButton(
-                text = "CONFIGURAÇÕES",
-                modifier = Modifier.weight(1f),
-                onClick = {
-                    onNavigate(GTStoreScreen.CONFIGURACOES)
-                }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Text(
-            text = "Arquivos: 0 • Downloads ativos: 0",
-            style = MaterialTheme.typography.bodyMedium
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Button(
-            onClick = {
-                onNavigate(GTStoreScreen.LOGS)
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("LOGS")
-        }
-    }
-}
-
-@Composable
-fun StatusCard(
-    title: String,
-    status: String
-) {
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-
-            Text(
-                text = title,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleSmall
-            )
-
-            Text(
-                text = status,
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
-    }
-}
-
-@Composable
-fun DashboardButton(
-    text: String,
-    modifier: Modifier,
-    onClick: () -> Unit
-) {
-
-    Button(
-        onClick = onClick,
-        modifier = modifier.height(50.dp),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-
-        Text(text)
-    }
-}
-
-@Composable
-fun SimpleScreen(
-    title: String,
-    onBack: () -> Unit
-) {
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-
-        Text(
-            text = "GTSTORE",
-            style = MaterialTheme.typography.headlineLarge
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineMedium
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Text(
-            text = "Esta tela será implementada na próxima etapa.",
-            style = MaterialTheme.typography.bodyLarge
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Button(
-            onClick = onBack
-        ) {
-            Text("VOLTAR")
-        }
-    }
-}
+                modifier = Modifier.weight(1f)
+            ) {
+                onNavigate(GT
