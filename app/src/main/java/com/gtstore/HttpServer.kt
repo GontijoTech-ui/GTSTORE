@@ -122,16 +122,16 @@ val localAddress: String
     }
 
     fun getStatus(): ServerStatus {
-        val address = getWifiIpv4Address()?.hostAddress ?: "0.0.0.0"
+    val address = getWifiIpv4Address()?.hostAddress ?: "0.0.0.0"
 
-        return ServerStatus(
-            online = running,
-            port = port,
-            address = address,
-            url = "http://$address:$port",
-            activeConnections = activeConnections
-        )
-    }
+    return ServerStatus(
+        online = running,
+        port = port,
+        address = address,
+        url = "http://$address:$port",
+        activeConnections = activeConnections
+    )
+}
 
     // ---------------------------------------------------------
     // CLIENT
