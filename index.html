@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GONTIJOTECH - PS4 Store</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { 
+            background-color: #0d0d0d; 
+            color: #ffffff; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container { width: 100%; max-width: 600px; text-align: center; }
+
+        /* Estilo do Cabeçalho e Logo */
+        .logo-img {
+            max-width: 280px;
+            height: auto;
+            margin-bottom: 10px;
+        }
+
+        .suporte-info {
+            color: #d13030;
+            font-size: 15px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            letter-spacing: 1px;
+        }
+
+        /* Estilo da Tela de PIN */
+        #pin-screen {
+            background: #181818;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(255, 68, 68, 0.15);
+            border: 1px solid #2a2a2a;
+        }
+
+        .pin-input {
+            width: 100%;
+            padding: 15px;
+            font-size: 24px;
+            text-align: center;
+            letter-spacing: 10px;
+            margin: 20px 0;
+            border: 2px solid #333;
+            border-radius: 8px;
+            background: #242424;
+            color: #fff;
+        }
+
+        .pin-input:focus { border-color: #d13030; outline: none; }
+
+        /* Estilo da Loja de Jogos */
+        #store-screen { display: none; width: 100%; text-align: left; }
+
+        .header-store {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 15px;
+        }
+
+        .card { 
+            background: #181818; 
+            border-radius: 8px; 
+            padding: 20px; 
+            margin-bottom: 12px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            border: 1px solid #262626;
+        }
+
+        .btn { 
+            background: #d13030; 
+            color: white; 
+            border: none; 
+            padding: 12px 24px; 
+            font-size: 16px; 
+            font-weight: bold;
+            border-radius: 6px; 
+            cursor: pointer; 
+            transition: background 0.2s;
+        }
+
+        .btn:hover { background: #b02424; }
+        .error-msg { color: #ff5252; margin-top: 10px; display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- LOGO GONTIJOTECH E SUPORTE -->
+        <img src="logo.jpg" alt="GONTIJOTECH" class="logo-img">
+        <div class="suporte-info">SUPORTE: (64) 99225-9727</div>
+
+        <!-- TELA DE BLOQUEIO / PIN -->
+        <div id="pin-screen">
+            <h2 style="margin-top: 0;">Acesso Restrito</h2>
+            <p style="color: #aaa; font-size: 16px;">Informe o PIN fornecido pelo seu provedor:</p>
+            <input type="password" id="pin-field" class="pin-input" maxlength="4" placeholder="••••">
+            <button class="btn" style="width: 100%;" onclick="validarPin()">ENTRAR</button>
+            <p id="error-msg" class="error-msg">PIN incorreto ou inválido! Solicite o código ao suporte.</p>
+        </div>
+
+        <!-- TELA DO CATÁLOGO DE JOGOS -->
+        <div id="store-screen">
+            <div class="header-store">
+                <h2 style="margin: 0;">Catálogo de Jogos</h2>
+                <span style="font-size: 13px; color: #aaa;">GONTIJOTECH OTG</span>
+            </div>
+            <div id="lista-jogos">Carregando jogos...</div>
+        </div>
+    </div>
+
+    <script>
+        let pinDoDia = null;
+        let jogosLista = [];
+
+        // Baixa o jogos.json e lê o PIN atualizado
+        window.onload = function() {
+            fetch('jogos.json?t=' + new Date().getTime())
+                .then(res => res.json())
+                .then(data => {
+                    pinDoDia = data.pin;
+                    jogosLista = data.pkgs;
+                })
+                .catch(err => {
+                    alert('Erro ao conectar ao repositório ou servidor.');
+                });
+        };
+
+        function validarPin() {
+            const pinDigitado = document.getElementById('pin-field').value;
+            const errorMsg = document.getElementById('error-msg');
+
+            if (pinDoDia && pinDigitado === pinDoDia) {
+                document.getElementById('pin-screen').style.display = 'none';
+                document.getElementById('store-screen').style.display = 'block';
+                renderizarJogos();
+            } else {
+                errorMsg.style.display = 'block';
+                document.getElementById('pin-field').value = '';
+            }
+        }
+
+        function renderizarJogos() {
+            let html = '';
+            if (!jogosLista || jogosLista.length === 0) {
+                html = '<p style="text-align: center; color: #aaa;">Nenhum jogo .pkg foi encontrado no HD Externo.</p>';
+            } else {
+                jogosLista.forEach(jogo => {
+                    html += `
+                        <div class="card">
+                            <div>
+                                <h3 style="margin: 0 0 8px 0; color: #fff;">${jogo.name}</h3>
+                                <p style="margin: 0; color: #888; font-size: 14px;">Tamanho: ${jogo.size}</p>
+                            </div>
+                            <button class="btn" onclick="instalarPkg('${jogo.url}')">Instalar</button>
+                        </div>
+                    `;
+                });
+            }
+            document.getElementById('lista-jogos').innerHTML = html;
+        }
+
+        function instalarPkg(urlPkg) {
+            fetch('http://127.0.0.1:12800/api/install', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'direct',
+                    packages: [ urlPkg ]
+                })
+            })
+            .then(res => alert('Download iniciado! Verifique as Transferências no PS4.'))
+            .catch(err => alert('Erro: Certifique-se de que o GoldHEN / Remote PKG Installer está ativo no PS4.'));
+        }
+    </script>
+</body>
+</html>
