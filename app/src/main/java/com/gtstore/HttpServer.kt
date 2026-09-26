@@ -176,3 +176,218 @@ class HttpServer(
                         ?: ""
 
                 val path =
+                    parts.getOrNull(1)
+                        ?.substringBefore("?")
+                        ?: "/"
+
+                when {
+
+                    method != "GET" -> {
+
+                        sendResponse(
+                            socket.outputStream,
+                            "405 Method Not Allowed",
+                            "text/plain; charset=utf-8",
+                            "Método não permitido."
+                        )
+                    }
+
+                    path == "/" -> {
+
+                        sendResponse(
+                            socket.outputStream,
+                            "200 OK",
+                            "text/html; charset=utf-8",
+                            buildHomePage()
+                        )
+                    }
+
+                    path == "/api/status" -> {
+
+                        sendResponse(
+                            socket.outputStream,
+                            "200 OK",
+                            "application/json; charset=utf-8",
+                            buildStatusJson()
+                        )
+                    }
+
+                    path == "/favicon.ico" -> {
+
+                        sendResponse(
+                            socket.outputStream,
+                            "204 No Content",
+                            "text/plain; charset=utf-8",
+                            ""
+                        )
+                    }
+
+                    else -> {
+
+                        sendResponse(
+                            socket.outputStream,
+                            "404 Not Found",
+                            "text/plain; charset=utf-8",
+                            "GTSTORE: página não encontrada."
+                        )
+                    }
+                }
+            }
+
+        } catch (_: Exception) {
+
+            // Cliente encerrou a conexão ou ocorreu erro de rede.
+
+        } finally {
+
+            activeConnections.decrementAndGet()
+
+            if (activeConnections.get() < 0) {
+                activeConnections.set(0)
+            }
+        }
+    }
+
+    private fun sendResponse(
+        output: OutputStream,
+        status: String,
+        contentType: String,
+        body: String
+    ) {
+
+        val bodyBytes =
+            body.toByteArray(
+                StandardCharsets.UTF_8
+            )
+
+        val headers =
+            buildString {
+
+                append("HTTP/1.1 ")
+                append(status)
+                append("\r\n")
+
+                append("Content-Type: ")
+                append(contentType)
+                append("\r\n")
+
+                append("Content-Length: ")
+                append(bodyBytes.size)
+                append("\r\n")
+
+                append("Connection: close\r\n")
+
+                append("Cache-Control: no-store\r\n")
+
+                append("Access-Control-Allow-Origin: *\r\n")
+
+                append("\r\n")
+            }
+
+        output.write(
+            headers.toByteArray(
+                StandardCharsets.UTF_8
+            )
+        )
+
+        if (bodyBytes.isNotEmpty()) {
+
+            output.write(bodyBytes)
+        }
+
+        output.flush()
+    }
+
+    private fun buildHomePage(): String {
+
+        val ip =
+            getLocalIpAddress()
+
+        return """
+            <!DOCTYPE html>
+            <html lang="pt-BR">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>GTSTORE</title>
+            </head>
+
+            <body>
+
+                <h1>GTSTORE</h1>
+
+                <p>Servidor HTTP funcionando.</p>
+
+                <p>
+                    Endereço:
+                    http://$ip:$port
+                </p>
+
+                <p>
+                    <a href="/api/status">
+                        Ver status da API
+                    </a>
+                </p>
+
+            </body>
+            </html>
+        """.trimIndent()
+    }
+
+    private fun buildStatusJson(): String {
+
+        return """
+            {
+                "server": "GTSTORE",
+                "running": ${running.get()},
+                "port": $port,
+                "local_address": "${getLocalIpAddress()}",
+                "active_connections": ${activeConnections.get()}
+            }
+        """.trimIndent()
+    }
+
+    private fun getLocalIpAddress(): String {
+
+        return try {
+
+            val interfaces =
+                Collections.list(
+                    NetworkInterface.getNetworkInterfaces()
+                )
+
+            for (networkInterface in interfaces) {
+
+                if (
+                    !networkInterface.isUp ||
+                    networkInterface.isLoopback
+                ) {
+                    continue
+                }
+
+                val addresses =
+                    Collections.list(
+                        networkInterface.inetAddresses
+                    )
+
+                for (address in addresses) {
+
+                    if (
+                        address is Inet4Address &&
+                        !address.isLoopbackAddress
+                    ) {
+
+                        return address.hostAddress
+                            ?: "0.0.0.0"
+                    }
+                }
+            }
+
+            "127.0.0.1"
+
+        } catch (_: SocketException) {
+
+            "127.0.0.1"
+        }
+    }
+}
