@@ -7,6 +7,9 @@
     <!-- Foreground Service -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
+    <!-- Foreground Service para sincronização/transferência de dados -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
     <application
         android:name=".GTStoreApplication"
         android:allowBackup="false"
@@ -26,7 +29,8 @@
 
         <service
             android:name=".GTStoreService"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
     </application>
 
