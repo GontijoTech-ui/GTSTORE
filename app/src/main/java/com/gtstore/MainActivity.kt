@@ -68,6 +68,9 @@ data class StorageInfo(
     val free: Long
 )
 
+private val gtStoreHttpServer =
+    HttpServer(8080)
+
 class MainActivity : ComponentActivity() {
 
     private var selectedFolderUri by mutableStateOf<Uri?>(null)
@@ -102,8 +105,13 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+    override fun onCreate(
+        savedInstanceState: Bundle?
+    ) {
+
+        super.onCreate(
+            savedInstanceState
+        )
 
         val savedUri =
             getPreferences(MODE_PRIVATE)
@@ -123,13 +131,30 @@ class MainActivity : ComponentActivity() {
             GTStoreTheme {
 
                 GTStoreApp(
-                    selectedFolderUri = selectedFolderUri,
+                    selectedFolderUri =
+                        selectedFolderUri,
+
                     onSelectFolder = {
                         folderPicker.launch(null)
                     }
                 )
             }
         }
+    }
+
+    override fun onDestroy() {
+
+        super.onDestroy()
+
+        /*
+         * Nesta primeira versão,
+         * o servidor é encerrado quando
+         * a Activity é destruída.
+         *
+         * Futuramente ele será transferido
+         * para um Foreground Service.
+         */
+        gtStoreHttpServer.stop()
     }
 }
 
@@ -156,11 +181,25 @@ fun GTStoreApp(
             )
         }
 
+        GTStoreScreen.SERVIDOR -> {
+
+            ServerScreen(
+                onBack = {
+                    currentScreen =
+                        GTStoreScreen.DASHBOARD
+                }
+            )
+        }
+
         GTStoreScreen.ARQUIVOS -> {
 
             FilesScreen(
-                selectedFolderUri = selectedFolderUri,
-                onSelectFolder = onSelectFolder,
+                selectedFolderUri =
+                    selectedFolderUri,
+
+                onSelectFolder =
+                    onSelectFolder,
+
                 onBack = {
                     currentScreen =
                         GTStoreScreen.DASHBOARD
@@ -171,29 +210,28 @@ fun GTStoreApp(
         else -> {
 
             SimpleScreen(
-                title = when (currentScreen) {
+                title =
+                    when (currentScreen) {
 
-                    GTStoreScreen.SERVIDOR ->
-                        "SERVIDOR"
+                        GTStoreScreen.CLOUDFLARE ->
+                            "CLOUDFLARE"
 
-                    GTStoreScreen.CLOUDFLARE ->
-                        "CLOUDFLARE"
+                        GTStoreScreen.GITHUB ->
+                            "GITHUB"
 
-                    GTStoreScreen.GITHUB ->
-                        "GITHUB"
+                        GTStoreScreen.DOWNLOADS ->
+                            "DOWNLOADS"
 
-                    GTStoreScreen.DOWNLOADS ->
-                        "DOWNLOADS"
+                        GTStoreScreen.CONFIGURACOES ->
+                            "CONFIGURAÇÕES"
 
-                    GTStoreScreen.CONFIGURACOES ->
-                        "CONFIGURAÇÕES"
+                        GTStoreScreen.LOGS ->
+                            "LOGS"
 
-                    GTStoreScreen.LOGS ->
-                        "LOGS"
+                        else ->
+                            "GTSTORE"
+                    },
 
-                    else ->
-                        "GTSTORE"
-                },
                 onBack = {
                     currentScreen =
                         GTStoreScreen.DASHBOARD
@@ -208,10 +246,33 @@ fun Dashboard(
     onNavigate: (GTStoreScreen) -> Unit
 ) {
 
+    var serverRunning by remember {
+        mutableStateOf(
+            gtStoreHttpServer.isRunning()
+        )
+    }
+
+    LaunchedEffect(
+        Unit
+    ) {
+
+        while (true) {
+
+            serverRunning =
+                gtStoreHttpServer.isRunning()
+
+            kotlinx.coroutines.delay(
+                1000
+            )
+        }
+    }
+
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+
         verticalArrangement =
             Arrangement.spacedBy(12.dp)
     ) {
@@ -238,7 +299,11 @@ fun Dashboard(
 
             StatusCard(
                 title = "SERVIDOR",
-                status = "OFFLINE"
+                status =
+                    if (serverRunning)
+                        "ONLINE"
+                    else
+                        "OFFLINE"
             )
         }
 
@@ -277,7 +342,10 @@ fun Dashboard(
                 modifier =
                     Modifier.fillMaxWidth()
             ) {
-                Text("SERVIDOR")
+
+                Text(
+                    "SERVIDOR"
+                )
             }
         }
 
@@ -292,7 +360,10 @@ fun Dashboard(
                 modifier =
                     Modifier.fillMaxWidth()
             ) {
-                Text("ARQUIVOS")
+
+                Text(
+                    "ARQUIVOS"
+                )
             }
         }
 
@@ -307,7 +378,10 @@ fun Dashboard(
                 modifier =
                     Modifier.fillMaxWidth()
             ) {
-                Text("CLOUDFLARE")
+
+                Text(
+                    "CLOUDFLARE"
+                )
             }
         }
 
@@ -322,7 +396,10 @@ fun Dashboard(
                 modifier =
                     Modifier.fillMaxWidth()
             ) {
-                Text("GITHUB")
+
+                Text(
+                    "GITHUB"
+                )
             }
         }
 
@@ -337,7 +414,10 @@ fun Dashboard(
                 modifier =
                     Modifier.fillMaxWidth()
             ) {
-                Text("DOWNLOADS")
+
+                Text(
+                    "DOWNLOADS"
+                )
             }
         }
 
@@ -352,7 +432,10 @@ fun Dashboard(
                 modifier =
                     Modifier.fillMaxWidth()
             ) {
-                Text("CONFIGURAÇÕES")
+
+                Text(
+                    "CONFIGURAÇÕES"
+                )
             }
         }
 
@@ -367,7 +450,248 @@ fun Dashboard(
                 modifier =
                     Modifier.fillMaxWidth()
             ) {
-                Text("LOGS")
+
+                Text(
+                    "LOGS"
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ServerScreen(
+    onBack: () -> Unit
+) {
+
+    var status by remember {
+        mutableStateOf(
+            gtStoreHttpServer.getStatus()
+        )
+    }
+
+    var message by remember {
+        mutableStateOf("")
+    }
+
+    var refreshCounter by remember {
+        mutableIntStateOf(0)
+    }
+
+    LaunchedEffect(
+        refreshCounter
+    ) {
+
+        status =
+            gtStoreHttpServer.getStatus()
+    }
+
+    LaunchedEffect(
+        Unit
+    ) {
+
+        while (true) {
+
+            status =
+                gtStoreHttpServer.getStatus()
+
+            kotlinx.coroutines.delay(
+                1000
+            )
+        }
+    }
+
+    LazyColumn(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+
+        verticalArrangement =
+            Arrangement.spacedBy(12.dp)
+    ) {
+
+        item {
+
+            Text(
+                text = "SERVIDOR",
+                style =
+                    MaterialTheme.typography.headlineMedium
+            )
+        }
+
+        item {
+
+            Card(
+                modifier =
+                    Modifier.fillMaxWidth()
+            ) {
+
+                Column(
+                    modifier =
+                        Modifier.padding(16.dp),
+
+                    verticalArrangement =
+                        Arrangement.spacedBy(8.dp)
+                ) {
+
+                    Text(
+                        text =
+                            if (status.running)
+                                "STATUS: ONLINE"
+                            else
+                                "STATUS: OFFLINE",
+
+                        style =
+                            MaterialTheme.typography.titleLarge
+                    )
+
+                    Text(
+                        text =
+                            "Porta: ${status.port}"
+                    )
+
+                    Text(
+                        text =
+                            "Endereço local: ${status.localAddress}"
+                    )
+
+                    if (status.running) {
+
+                        Text(
+                            text =
+                                "URL: http://${status.localAddress}:${status.port}"
+                        )
+                    }
+
+                    Text(
+                        text =
+                            "Conexões ativas: ${status.activeConnections}"
+                    )
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(8.dp)
+                    )
+
+                    Button(
+                        onClick = {
+
+                            if (
+                                gtStoreHttpServer
+                                    .isRunning()
+                            ) {
+
+                                gtStoreHttpServer.stop()
+
+                                message =
+                                    "Servidor parado."
+
+                            } else {
+
+                                val started =
+                                    gtStoreHttpServer
+                                        .start()
+
+                                message =
+                                    if (started)
+                                        "Servidor iniciado."
+                                    else
+                                        "Não foi possível iniciar o servidor. A porta pode estar ocupada."
+
+                            }
+
+                            refreshCounter++
+                        },
+
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    ) {
+
+                        Text(
+                            if (status.running)
+                                "PARAR SERVIDOR"
+                            else
+                                "INICIAR SERVIDOR"
+                        )
+                    }
+
+                    if (message.isNotBlank()) {
+
+                        Text(
+                            text = message
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+
+                            status =
+                                gtStoreHttpServer
+                                    .getStatus()
+
+                        },
+
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    ) {
+
+                        Text(
+                            "ATUALIZAR STATUS"
+                        )
+                    }
+
+                    Button(
+                        onClick = onBack,
+
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    ) {
+
+                        Text(
+                            "VOLTAR"
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+
+            Card(
+                modifier =
+                    Modifier.fillMaxWidth()
+            ) {
+
+                Column(
+                    modifier =
+                        Modifier.padding(16.dp),
+
+                    verticalArrangement =
+                        Arrangement.spacedBy(6.dp)
+                ) {
+
+                    Text(
+                        text = "TESTE",
+                        style =
+                            MaterialTheme.typography.titleLarge
+                    )
+
+                    Text(
+                        text =
+                            "Quando o servidor estiver online, abra a URL exibida em outro dispositivo conectado à mesma rede Wi-Fi."
+                    )
+
+                    Text(
+                        text =
+                            "Página principal: /"
+                    )
+
+                    Text(
+                        text =
+                            "API de teste: /api/status"
+                    )
+                }
             }
         }
     }
@@ -461,11 +785,13 @@ fun FilesScreen(
             PackageCatalog.synchronize(
                 context =
                     GTStoreApplication.context,
+
                 currentPackages =
                     catalogPackages
             )
 
-        packages = scannedPackages
+        packages =
+            scannedPackages
 
         lastAddedCount =
             syncResult.added.size
@@ -506,6 +832,7 @@ fun FilesScreen(
             Modifier
                 .fillMaxSize()
                 .padding(16.dp),
+
         verticalArrangement =
             Arrangement.spacedBy(12.dp)
     ) {
@@ -529,6 +856,7 @@ fun FilesScreen(
                 Column(
                     modifier =
                         Modifier.padding(16.dp),
+
                     verticalArrangement =
                         Arrangement.spacedBy(6.dp)
                 ) {
@@ -539,7 +867,9 @@ fun FilesScreen(
                             MaterialTheme.typography.titleLarge
                     )
 
-                    if (selectedFolderUri == null) {
+                    if (
+                        selectedFolderUri == null
+                    ) {
 
                         Text(
                             text =
@@ -588,7 +918,9 @@ fun FilesScreen(
                                 "PKGs encontrados: ${packages.size}"
                         )
 
-                        if (lastScan.isNotBlank()) {
+                        if (
+                            lastScan.isNotBlank()
+                        ) {
 
                             Text(
                                 text =
@@ -658,6 +990,7 @@ fun FilesScreen(
                             onClick = {
                                 refreshCounter++
                             },
+
                             enabled =
                                 selectedFolderUri != null &&
                                     !scanning
@@ -694,6 +1027,7 @@ fun FilesScreen(
 
                     Button(
                         onClick = onBack,
+
                         modifier =
                             Modifier.fillMaxWidth()
                     ) {
@@ -706,22 +1040,28 @@ fun FilesScreen(
             }
         }
 
-        if (selectedFolderUri != null) {
+        if (
+            selectedFolderUri != null
+        ) {
 
             item {
 
                 OutlinedTextField(
                     value = searchText,
+
                     onValueChange = {
                         searchText = it
                     },
+
                     modifier =
                         Modifier.fillMaxWidth(),
+
                     label = {
                         Text(
                             "Pesquisar PKG"
                         )
                     },
+
                     singleLine = true
                 )
             }
@@ -746,6 +1086,7 @@ fun FilesScreen(
                                 "Nenhum arquivo .pkg encontrado."
                             else
                                 "Nenhum PKG corresponde à pesquisa.",
+
                         modifier =
                             Modifier.padding(16.dp)
                     )
@@ -754,7 +1095,9 @@ fun FilesScreen(
         }
 
         items(
-            items = filteredPackages,
+            items =
+                filteredPackages,
+
             key = {
                 it.id
             }
@@ -1012,6 +1355,7 @@ fun PackageCard(
         Column(
             modifier =
                 Modifier.padding(16.dp),
+
             verticalArrangement =
                 Arrangement.spacedBy(4.dp)
         ) {
@@ -1033,86 +1377,4 @@ fun PackageCard(
 
                 Text(
                     text =
-                        "Versão: ${pkg.version}"
-                )
-            }
-
-            Text(
-                text =
-                    "Tipo: PKG"
-            )
-        }
-    }
-}
-
-@Composable
-fun StatusCard(
-    title: String,
-    status: String
-) {
-
-    Card(
-        modifier =
-            Modifier.fillMaxWidth()
-    ) {
-
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-            horizontalArrangement =
-                Arrangement.SpaceBetween
-        ) {
-
-            Text(
-                text = title,
-                style =
-                    MaterialTheme.typography.titleMedium
-            )
-
-            Text(
-                text = status
-            )
-        }
-    }
-}
-
-@Composable
-fun SimpleScreen(
-    title: String,
-    onBack: () -> Unit
-) {
-
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-        verticalArrangement =
-            Arrangement.spacedBy(16.dp)
-    ) {
-
-        Text(
-            text = title,
-            style =
-                MaterialTheme.typography.headlineMedium
-        )
-
-        Text(
-            text =
-                "Módulo em desenvolvimento."
-        )
-
-        Button(
-            onClick = onBack,
-            modifier =
-                Modifier.fillMaxWidth()
-        ) {
-
-            Text(
-                "VOLTAR"
-            )
-        }
-    }
-}
+                        "
