@@ -5,12 +5,12 @@ plugins {
 
 android {
     namespace = "com.gontijotech.gtstore"
-    compileSdk = 34
+    compileSdk = 33
 
     defaultConfig {
         applicationId = "com.gontijotech.gtstore"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 33
         versionCode = 1
         versionName = "1.0"
     }
@@ -25,6 +25,6 @@ android {
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.core:core-ktx:1.9.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
 }
