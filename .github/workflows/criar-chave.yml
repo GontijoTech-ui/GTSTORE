@@ -1,0 +1,55 @@
+name: Criar chave de assinatura GTSTORE
+
+on:
+  workflow_dispatch:
+
+jobs:
+  criar-chave:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configurar Java JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      - name: Verificar senha
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "ERRO: o Secret KEYSTORE_PASSWORD não foi configurado."
+            exit 1
+          fi
+
+      - name: Criar chave de assinatura
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          keytool -genkeypair \
+            -v \
+            -keystore gtstore-release.jks \
+            -alias gtstore \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -keypass "$KEYSTORE_PASSWORD" \
+            -dname "CN=GTSTORE, OU=GTSTORE, O=GontijoTech, L=Brazil, ST=Goias, C=BR"
+
+      - name: Verificar chave criada
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          keytool -list \
+            -keystore gtstore-release.jks \
+            -storepass "$KEYSTORE_PASSWORD"
+
+      - name: Disponibilizar chave
+        uses: actions/upload-artifact@v4
+        with:
+          name: GTSTORE-Release-Key
+          path: gtstore-release.jks
+          if-no-files-found: error
+          retention-days: 1
