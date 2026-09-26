@@ -1,0 +1,43 @@
+name: Criar Gradle Wrapper
+
+on:
+  workflow_dispatch:
+
+jobs:
+  wrapper:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Configurar JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      - name: Instalar Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+
+      - name: Criar Gradle Wrapper
+        run: gradle wrapper --gradle-version 8.13
+
+      - name: Enviar Wrapper para o repositório
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add gradlew gradlew.bat gradle/wrapper
+
+          if git diff --cached --quiet; then
+            echo "Gradle Wrapper já existe."
+          else
+            git commit -m "Adicionar Gradle Wrapper"
+            git push
+          fi
+
+
+
