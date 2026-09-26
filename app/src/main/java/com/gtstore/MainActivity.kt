@@ -1,8 +1,11 @@
 package com.gtstore
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,6 +15,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -19,6 +24,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,9 +32,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.documentfile.provider.DocumentFile
 import com.gtstore.ui.theme.GTStoreTheme
+import java.util.Locale
 
 enum class GTStoreScreen {
     DASHBOARD,
@@ -49,19 +55,67 @@ data class PackageItem(
 
 class MainActivity : ComponentActivity() {
 
+    private var selectedFolderUri by mutableStateOf<Uri?>(null)
+
+    private val folderPicker =
+        registerForActivityResult(
+            ActivityResultContracts.OpenDocumentTree()
+        ) { uri ->
+
+            if (uri != null) {
+
+                try {
+
+                    contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                                Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    )
+
+                } catch (_: Exception) {
+                    contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                }
+
+                getPreferences(MODE_PRIVATE)
+                    .edit()
+                    .putString("pkg_folder_uri", uri.toString())
+                    .apply()
+
+                selectedFolderUri = uri
+            }
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        val savedUri = getPreferences(MODE_PRIVATE)
+            .getString("pkg_folder_uri", null)
+
+        if (savedUri != null) {
+            selectedFolderUri = Uri.parse(savedUri)
+        }
+
         setContent {
             GTStoreTheme {
-                GTStoreApp()
+                GTStoreApp(
+                    selectedFolderUri = selectedFolderUri,
+                    onSelectFolder = {
+                        folderPicker.launch(null)
+                    }
+                )
             }
         }
     }
 }
 
 @Composable
-fun GTStoreApp() {
+fun GTStoreApp(
+    selectedFolderUri: Uri?,
+    onSelectFolder: () -> Unit
+) {
 
     var currentScreen by remember {
         mutableStateOf(GTStoreScreen.DASHBOARD)
@@ -80,8 +134,8 @@ fun GTStoreApp() {
 
             GTStoreScreen.DASHBOARD -> {
                 Dashboard(
-                    onNavigate = { screen ->
-                        currentScreen = screen
+                    onNavigate = {
+                        currentScreen = it
                     }
                 )
             }
@@ -96,6 +150,8 @@ fun GTStoreApp() {
 
             GTStoreScreen.ARQUIVOS -> {
                 FilesScreen(
+                    selectedFolderUri = selectedFolderUri,
+                    onSelectFolder = onSelectFolder,
                     onBack = goBack
                 )
             }
@@ -180,7 +236,7 @@ fun Dashboard(
 
         StatusCard(
             title = "HD",
-            status = "● CONECTADO"
+            status = "● AGUARDANDO"
         )
 
         Spacer(
@@ -189,7 +245,7 @@ fun Dashboard(
 
         StatusCard(
             title = "CLOUDFLARE",
-            status = "● CONECTADO"
+            status = "● AGUARDANDO"
         )
 
         Spacer(
@@ -198,7 +254,7 @@ fun Dashboard(
 
         StatusCard(
             title = "GITHUB",
-            status = "● SINCRONIZADO"
+            status = "● AGUARDANDO"
         )
 
         Spacer(
@@ -346,6 +402,8 @@ fun DashboardRow(
 
 @Composable
 fun FilesScreen(
+    selectedFolderUri: Uri?,
+    onSelectFolder: () -> Unit,
     onBack: () -> Unit
 ) {
 
@@ -353,28 +411,28 @@ fun FilesScreen(
         mutableStateOf("")
     }
 
-    val packages = remember {
+    var packages by remember {
+        mutableStateOf<List<PackageItem>>(emptyList())
+    }
 
-        listOf(
+    var scanning by remember {
+        mutableStateOf(false)
+    }
 
-            PackageItem(
-                name = "PS4 Temperature",
-                size = "12 MB",
-                version = "1.0.0"
-            ),
+    LaunchedEffect(selectedFolderUri) {
 
-            PackageItem(
-                name = "Homebrew Store",
-                size = "25 MB",
-                version = "2.1.0"
-            ),
+        if (selectedFolderUri != null) {
 
-            PackageItem(
-                name = "Payload Example",
-                size = "4 MB",
-                version = "1.0.2"
+            scanning = true
+
+            packages = scanPackages(
+                selectedFolderUri
             )
-        )
+
+            scanning = false
+        } else {
+            packages = emptyList()
+        }
     }
 
     val filteredPackages = packages.filter { packageItem ->
@@ -431,21 +489,52 @@ fun FilesScreen(
                     modifier = Modifier.height(12.dp)
                 )
 
-                Text(
-                    text = "HD: CONECTADO"
-                )
+                if (selectedFolderUri == null) {
 
-                Text(
-                    text = "Espaço usado: 0 GB"
-                )
+                    Text(
+                        text = "Nenhuma pasta selecionada."
+                    )
 
-                Text(
-                    text = "Espaço livre: 0 GB"
-                )
+                    Spacer(
+                        modifier = Modifier.height(12.dp)
+                    )
 
-                Text(
-                    text = "PKGs encontrados: ${packages.size}"
-                )
+                    Button(
+                        onClick = onSelectFolder,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("SELECIONAR PASTA DO HD")
+                    }
+
+                } else {
+
+                    Text(
+                        text = "HD: CONECTADO"
+                    )
+
+                    Spacer(
+                        modifier = Modifier.height(4.dp)
+                    )
+
+                    Text(
+                        text = if (scanning) {
+                            "Procurando PKGs..."
+                        } else {
+                            "PKGs encontrados: ${packages.size}"
+                        }
+                    )
+
+                    Spacer(
+                        modifier = Modifier.height(12.dp)
+                    )
+
+                    Button(
+                        onClick = onSelectFolder,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("ALTERAR PASTA")
+                    }
+                }
             }
         }
 
@@ -484,6 +573,113 @@ fun FilesScreen(
     }
 }
 
+fun scanPackages(
+    folderUri: Uri
+): List<PackageItem> {
+
+    val result = mutableListOf<PackageItem>()
+
+    return try {
+
+        val root = DocumentFile.fromTreeUri(
+            GTStoreApplication.context,
+            folderUri
+        )
+
+        if (root != null) {
+
+            scanDocumentTree(
+                root = root,
+                result = result
+            )
+        }
+
+        result.sortedBy {
+            it.name.lowercase(Locale.getDefault())
+        }
+
+    } catch (_: Exception) {
+
+        emptyList()
+    }
+}
+
+fun scanDocumentTree(
+    root: DocumentFile,
+    result: MutableList<PackageItem>
+) {
+
+    for (file in root.listFiles()) {
+
+        if (file.isDirectory) {
+
+            scanDocumentTree(
+                root = file,
+                result = result
+            )
+
+        } else if (
+            file.isFile &&
+            file.name?.lowercase(Locale.getDefault())?.endsWith(".pkg") == true
+        ) {
+
+            val fileName = file.name ?: "PKG"
+
+            val size = formatFileSize(
+                file.length()
+            )
+
+            result.add(
+                PackageItem(
+                    name = fileName,
+                    size = size,
+                    version = "Detectar"
+                )
+            )
+        }
+    }
+}
+
+fun formatFileSize(
+    bytes: Long
+): String {
+
+    if (bytes <= 0) {
+        return "0 B"
+    }
+
+    val units = arrayOf(
+        "B",
+        "KB",
+        "MB",
+        "GB",
+        "TB"
+    )
+
+    var value = bytes.toDouble()
+    var index = 0
+
+    while (value >= 1024 && index < units.lastIndex) {
+
+        value /= 1024
+        index++
+    }
+
+    return if (index == 0) {
+
+        "${value.toLong()} ${units[index]}"
+
+    } else {
+
+        String.format(
+            Locale.US,
+            "%.2f %s",
+            value,
+            units[index]
+        )
+    }
+}
+
 @Composable
 fun PackageCard(
     packageItem: PackageItem
@@ -508,11 +704,11 @@ fun PackageCard(
             )
 
             Text(
-                text = "Versão: ${packageItem.version}"
+                text = "Tamanho: ${packageItem.size}"
             )
 
             Text(
-                text = "Tamanho: ${packageItem.size}"
+                text = "Versão: ${packageItem.version}"
             )
 
             Spacer(
