@@ -4,8 +4,7 @@
     <application
         android:allowBackup="false"
         android:label="GTSTORE"
-        android:supportsRtl="true"
-        android:theme="@style/Theme.GTSTORE">
+        android:supportsRtl="true">
 
         <activity
             android:name=".MainActivity"
