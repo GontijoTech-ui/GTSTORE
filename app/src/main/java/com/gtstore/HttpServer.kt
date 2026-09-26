@@ -1,16 +1,16 @@
 package com.gtstore
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStream
 import java.net.Inet4Address
 import java.net.InetAddress
-import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.net.Socket
-import java.net.SocketException
 import java.nio.charset.StandardCharsets
-import java.util.Collections
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -22,6 +22,7 @@ data class ServerStatus(
 )
 
 class HttpServer(
+    private val context: Context,
     private val port: Int = 8080
 ) {
 
@@ -38,12 +39,26 @@ class HttpServer(
             return true
         }
 
+        val wifiAddress = getWifiIpv4Address()
+
+        if (wifiAddress == null) {
+            return false
+        }
+
         return try {
 
+            /*
+             * O servidor é vinculado EXCLUSIVAMENTE ao
+             * endereço IPv4 da interface Wi-Fi.
+             *
+             * Não usamos 0.0.0.0 porque isso faria o
+             * servidor escutar também em outras interfaces,
+             * como dados móveis.
+             */
             val socket = ServerSocket(
                 port,
                 50,
-                InetAddress.getByName("0.0.0.0")
+                wifiAddress
             )
 
             socket.reuseAddress = true
@@ -130,9 +145,75 @@ class HttpServer(
         return ServerStatus(
             running = running.get(),
             port = port,
-            localAddress = getLocalIpAddress(),
-            activeConnections = activeConnections.get()
+            localAddress =
+                getWifiIpv4Address()
+                    ?.hostAddress
+                    ?: "SEM WI-FI",
+            activeConnections =
+                activeConnections.get()
         )
+    }
+
+    private fun getWifiIpv4Address(): Inet4Address? {
+
+        return try {
+
+            val connectivityManager =
+                context.getSystemService(
+                    Context.CONNECTIVITY_SERVICE
+                ) as ConnectivityManager
+
+            val network =
+                connectivityManager.activeNetwork
+                    ?: return null
+
+            val capabilities =
+                connectivityManager.getNetworkCapabilities(
+                    network
+                )
+                    ?: return null
+
+            /*
+             * REGRA PRINCIPAL:
+             *
+             * O servidor só funciona quando a rede ativa
+             * possui transporte Wi-Fi.
+             */
+            if (
+                !capabilities.hasTransport(
+                    NetworkCapabilities.TRANSPORT_WIFI
+                )
+            ) {
+                return null
+            }
+
+            val linkProperties =
+                connectivityManager.getLinkProperties(
+                    network
+                )
+                    ?: return null
+
+            for (linkAddress in linkProperties.linkAddresses) {
+
+                val address =
+                    linkAddress.address
+
+                if (
+                    address is Inet4Address &&
+                    !address.isLoopbackAddress &&
+                    isPrivateIpv4(address)
+                ) {
+
+                    return address
+                }
+            }
+
+            null
+
+        } catch (_: Exception) {
+
+            null
+        }
     }
 
     private fun handleClient(
@@ -300,7 +381,9 @@ class HttpServer(
     private fun buildHomePage(): String {
 
         val ip =
-            getLocalIpAddress()
+            getWifiIpv4Address()
+                ?.hostAddress
+                ?: "SEM WI-FI"
 
         return """
             <!DOCTYPE html>
@@ -320,7 +403,7 @@ class HttpServer(
                 <h1>GTSTORE</h1>
 
                 <p>
-                    Servidor HTTP funcionando.
+                    Servidor HTTP funcionando exclusivamente por Wi-Fi.
                 </p>
 
                 <p>
@@ -342,102 +425,21 @@ class HttpServer(
 
     private fun buildStatusJson(): String {
 
+        val ip =
+            getWifiIpv4Address()
+                ?.hostAddress
+                ?: "SEM WI-FI"
+
         return """
             {
                 "server": "GTSTORE",
                 "running": ${running.get()},
                 "port": $port,
-                "local_address": "${getLocalIpAddress()}",
+                "local_address": "$ip",
+                "network": "WIFI",
                 "active_connections": ${activeConnections.get()}
             }
         """.trimIndent()
-    }
-
-    private fun getLocalIpAddress(): String {
-
-        return try {
-
-            val interfaces =
-                Collections.list(
-                    NetworkInterface.getNetworkInterfaces()
-                )
-
-            /*
-             * Primeiro procuramos uma interface que tenha
-             * endereço IPv4 privado típico de uma rede local.
-             *
-             * Exemplos:
-             * 192.168.x.x
-             * 10.x.x.x
-             * 172.16.x.x até 172.31.x.x
-             */
-
-            for (networkInterface in interfaces) {
-
-                if (
-                    !networkInterface.isUp ||
-                    networkInterface.isLoopback
-                ) {
-                    continue
-                }
-
-                val addresses =
-                    Collections.list(
-                        networkInterface.inetAddresses
-                    )
-
-                for (address in addresses) {
-
-                    if (
-                        address is Inet4Address &&
-                        !address.isLoopbackAddress &&
-                        isPrivateIpv4(address)
-                    ) {
-
-                        return address.hostAddress
-                            ?: continue
-                    }
-                }
-            }
-
-            /*
-             * Fallback caso a interface Wi-Fi não seja
-             * identificada como endereço privado.
-             */
-
-            for (networkInterface in interfaces) {
-
-                if (
-                    !networkInterface.isUp ||
-                    networkInterface.isLoopback
-                ) {
-                    continue
-                }
-
-                val addresses =
-                    Collections.list(
-                        networkInterface.inetAddresses
-                    )
-
-                for (address in addresses) {
-
-                    if (
-                        address is Inet4Address &&
-                        !address.isLoopbackAddress
-                    ) {
-
-                        return address.hostAddress
-                            ?: continue
-                    }
-                }
-            }
-
-            "127.0.0.1"
-
-        } catch (_: SocketException) {
-
-            "127.0.0.1"
-        }
     }
 
     private fun isPrivateIpv4(
