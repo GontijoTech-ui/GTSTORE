@@ -2,6 +2,7 @@ package com.gtstore
 
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.os.StatFs
@@ -71,12 +72,9 @@ data class StorageInfo(
 
 class MainActivity : ComponentActivity() {
 
-    private val gtStoreHttpServer by lazy {
-        HttpServer(
-            applicationContext,
-            8080
-        )
-    }
+    private val gtStoreHttpServer: HttpServer
+        get() =
+            (application as GTStoreApplication).httpServer
 
     private var selectedFolderUri by mutableStateOf<Uri?>(null)
 
@@ -98,7 +96,7 @@ class MainActivity : ComponentActivity() {
 
                 /*
                  * Mantemos o armazenamento original da Activity
-                 * para não quebrar a configuração já existente.
+                 * para preservar a configuração existente.
                  */
                 getPreferences(MODE_PRIVATE)
                     .edit()
@@ -109,8 +107,8 @@ class MainActivity : ComponentActivity() {
                     .apply()
 
                 /*
-                 * Também salvamos a mesma URI em uma preferência
-                 * compartilhada com o HttpServer.
+                 * Também salvamos a URI nas preferências
+                 * compartilhadas usadas pelo HttpServer.
                  */
                 getSharedPreferences(
                     "GTSTORE",
@@ -148,8 +146,6 @@ class MainActivity : ComponentActivity() {
 
         /*
          * Se não existir, usamos a preferência antiga da Activity.
-         * Isso preserva uma pasta que já tenha sido selecionada
-         * antes desta alteração.
          */
         val savedUri =
             sharedSavedUri
@@ -193,16 +189,74 @@ class MainActivity : ComponentActivity() {
                     },
 
                     httpServer =
-                        gtStoreHttpServer
+                        gtStoreHttpServer,
+
+                    onStartServer =
+                        ::startServerService,
+
+                    onStopServer =
+                        ::stopServerService
                 )
             }
         }
     }
 
+    /*
+     * Inicia o Foreground Service.
+     *
+     * O próprio GTStoreService será responsável por
+     * iniciar o HttpServer.
+     */
+    private fun startServerService() {
+
+        val intent =
+            Intent(
+                this,
+                GTStoreService::class.java
+            ).apply {
+                action =
+                    GTStoreService.ACTION_START
+            }
+
+        if (
+            Build.VERSION.SDK_INT >=
+            Build.VERSION_CODES.O
+        ) {
+
+            startForegroundService(intent)
+
+        } else {
+
+            startService(intent)
+        }
+    }
+
+    /*
+     * Solicita ao serviço que pare o servidor.
+     */
+    private fun stopServerService() {
+
+        val intent =
+            Intent(
+                this,
+                GTStoreService::class.java
+            ).apply {
+                action =
+                    GTStoreService.ACTION_STOP
+            }
+
+        startService(intent)
+    }
+
+    /*
+     * IMPORTANTE:
+     *
+     * Não paramos mais o HttpServer em onDestroy().
+     *
+     * A Activity pode ser destruída enquanto o
+     * GTStoreService continua executando em segundo plano.
+     */
     override fun onDestroy() {
-
-        gtStoreHttpServer.stop()
-
         super.onDestroy()
     }
 }
@@ -211,7 +265,9 @@ class MainActivity : ComponentActivity() {
 fun GTStoreApp(
     selectedFolderUri: Uri?,
     onSelectFolder: () -> Unit,
-    httpServer: HttpServer
+    httpServer: HttpServer,
+    onStartServer: () -> Unit,
+    onStopServer: () -> Unit
 ) {
 
     var currentScreen by remember {
@@ -236,6 +292,8 @@ fun GTStoreApp(
 
             ServerScreen(
                 httpServer = httpServer,
+                onStartServer = onStartServer,
+                onStopServer = onStopServer,
                 onBack = {
                     currentScreen =
                         GTStoreScreen.DASHBOARD
@@ -490,6 +548,8 @@ fun Dashboard(
 @Composable
 fun ServerScreen(
     httpServer: HttpServer,
+    onStartServer: () -> Unit,
+    onStopServer: () -> Unit,
     onBack: () -> Unit
 ) {
 
@@ -594,26 +654,18 @@ fun ServerScreen(
                                 httpServer.isRunning()
                             ) {
 
-                                httpServer.stop()
+                                onStopServer()
 
                                 message =
-                                    "Servidor parado."
+                                    "Solicitação para parar o servidor enviada."
 
                             } else {
 
-                                val started =
-                                    httpServer.start()
+                                onStartServer()
 
                                 message =
-                                    if (started) {
-                                        "Servidor iniciado."
-                                    } else {
-                                        "Não foi possível iniciar. Verifique se o Wi-Fi está conectado e se a porta 8080 está disponível."
-                                    }
+                                    "Solicitação para iniciar o servidor enviada."
                             }
-
-                            status =
-                                httpServer.getStatus()
                         },
 
                         modifier =
