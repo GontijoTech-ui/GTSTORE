@@ -50,8 +50,14 @@ class HttpServer(
     )
 
     @Volatile
-    private var activeConnections = 0
+private var activeConnections = 0
 
+val running: Boolean
+    get() = this@HttpServer.isRunning()
+
+val localAddress: String
+    get() = getWifiIpv4Address()?.hostAddress ?: "0.0.0.0"
+    
     // ---------------------------------------------------------
     // START
     // ---------------------------------------------------------
