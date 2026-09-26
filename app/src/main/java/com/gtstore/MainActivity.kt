@@ -3,6 +3,9 @@ package com.gtstore
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
+import android.os.StatFs
+import android.provider.DocumentsContract
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -34,6 +37,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
 import com.gtstore.ui.theme.GTStoreTheme
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 enum class GTStoreScreen {
@@ -53,6 +58,12 @@ data class PackageItem(
     val version: String
 )
 
+data class StorageInfo(
+    val total: String,
+    val used: String,
+    val free: String
+)
+
 class MainActivity : ComponentActivity() {
 
     private var selectedFolderUri by mutableStateOf<Uri?>(null)
@@ -65,13 +76,11 @@ class MainActivity : ComponentActivity() {
             if (uri != null) {
 
                 try {
-
                     contentResolver.takePersistableUriPermission(
                         uri,
                         Intent.FLAG_GRANT_READ_URI_PERMISSION or
                                 Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                     )
-
                 } catch (_: Exception) {
                     contentResolver.takePersistableUriPermission(
                         uri,
@@ -415,11 +424,26 @@ fun FilesScreen(
         mutableStateOf<List<PackageItem>>(emptyList())
     }
 
+    var storageInfo by remember {
+        mutableStateOf<StorageInfo?>(null)
+    }
+
     var scanning by remember {
         mutableStateOf(false)
     }
 
-    LaunchedEffect(selectedFolderUri) {
+    var lastScan by remember {
+        mutableStateOf("")
+    }
+
+    var refreshCounter by remember {
+        mutableStateOf(0)
+    }
+
+    LaunchedEffect(
+        selectedFolderUri,
+        refreshCounter
+    ) {
 
         if (selectedFolderUri != null) {
 
@@ -429,9 +453,22 @@ fun FilesScreen(
                 selectedFolderUri
             )
 
+            storageInfo = getStorageInfo(
+                selectedFolderUri
+            )
+
+            lastScan = SimpleDateFormat(
+                "dd/MM/yyyy HH:mm:ss",
+                Locale.getDefault()
+            ).format(Date())
+
             scanning = false
+
         } else {
+
             packages = emptyList()
+            storageInfo = null
+            lastScan = ""
         }
     }
 
@@ -516,6 +553,25 @@ fun FilesScreen(
                         modifier = Modifier.height(4.dp)
                     )
 
+                    if (storageInfo != null) {
+
+                        Text(
+                            text = "Capacidade: ${storageInfo!!.total}"
+                        )
+
+                        Text(
+                            text = "Usado: ${storageInfo!!.used}"
+                        )
+
+                        Text(
+                            text = "Livre: ${storageInfo!!.free}"
+                        )
+                    }
+
+                    Spacer(
+                        modifier = Modifier.height(4.dp)
+                    )
+
                     Text(
                         text = if (scanning) {
                             "Procurando PKGs..."
@@ -524,15 +580,37 @@ fun FilesScreen(
                         }
                     )
 
+                    if (lastScan.isNotEmpty()) {
+
+                        Text(
+                            text = "Última verificação: $lastScan"
+                        )
+                    }
+
                     Spacer(
                         modifier = Modifier.height(12.dp)
                     )
 
-                    Button(
-                        onClick = onSelectFolder,
-                        modifier = Modifier.fillMaxWidth()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("ALTERAR PASTA")
+
+                        Button(
+                            onClick = {
+                                refreshCounter++
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("ATUALIZAR")
+                        }
+
+                        Button(
+                            onClick = onSelectFolder,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("ALTERAR PASTA")
+                        }
                     }
                 }
             }
@@ -620,7 +698,9 @@ fun scanDocumentTree(
 
         } else if (
             file.isFile &&
-            file.name?.lowercase(Locale.getDefault())?.endsWith(".pkg") == true
+            file.name
+                ?.lowercase(Locale.getDefault())
+                ?.endsWith(".pkg") == true
         ) {
 
             val fileName = file.name ?: "PKG"
@@ -637,6 +717,61 @@ fun scanDocumentTree(
                 )
             )
         }
+    }
+}
+
+fun getStorageInfo(
+    folderUri: Uri
+): StorageInfo? {
+
+    return try {
+
+        val documentId =
+            DocumentsContract.getTreeDocumentId(
+                folderUri
+            )
+
+        val volumeName =
+            documentId.substringBefore(":")
+
+        val path = if (
+            volumeName.equals(
+                "primary",
+                ignoreCase = true
+            )
+        ) {
+
+            Environment
+                .getExternalStorageDirectory()
+                .absolutePath
+
+        } else {
+
+            "/storage/$volumeName"
+        }
+
+        val statFs = StatFs(path)
+
+        val totalBytes =
+            statFs.blockCountLong *
+                    statFs.blockSizeLong
+
+        val freeBytes =
+            statFs.availableBlocksLong *
+                    statFs.blockSizeLong
+
+        val usedBytes =
+            totalBytes - freeBytes
+
+        StorageInfo(
+            total = formatFileSize(totalBytes),
+            used = formatFileSize(usedBytes),
+            free = formatFileSize(freeBytes)
+        )
+
+    } catch (_: Exception) {
+
+        null
     }
 }
 
@@ -659,7 +794,10 @@ fun formatFileSize(
     var value = bytes.toDouble()
     var index = 0
 
-    while (value >= 1024 && index < units.lastIndex) {
+    while (
+        value >= 1024 &&
+        index < units.lastIndex
+    ) {
 
         value /= 1024
         index++
