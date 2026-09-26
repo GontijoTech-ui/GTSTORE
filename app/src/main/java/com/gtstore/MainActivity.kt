@@ -3,6 +3,7 @@ package com.gtstore
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,8 +29,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.gtstore.ui.theme.GTStoreTheme
+import kotlin.math.abs
 
 enum class GTStoreScreen {
     DASHBOARD,
@@ -68,6 +71,10 @@ fun GTStoreApp() {
         mutableStateOf(GTStoreScreen.DASHBOARD)
     }
 
+    val goBack = {
+        currentScreen = GTStoreScreen.DASHBOARD
+    }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -84,67 +91,122 @@ fun GTStoreApp() {
             }
 
             GTStoreScreen.ARQUIVOS -> {
-                FilesScreen(
-                    onBack = {
-                        currentScreen = GTStoreScreen.DASHBOARD
-                    }
-                )
+                BackGestureScreen(
+                    onBack = goBack
+                ) {
+                    FilesScreen(
+                        onBack = goBack
+                    )
+                }
             }
 
             GTStoreScreen.SERVIDOR -> {
-                SimpleScreen(
-                    title = "SERVIDOR",
-                    onBack = {
-                        currentScreen = GTStoreScreen.DASHBOARD
-                    }
-                )
+                BackGestureScreen(
+                    onBack = goBack
+                ) {
+                    SimpleScreen(
+                        title = "SERVIDOR",
+                        onBack = goBack
+                    )
+                }
             }
 
             GTStoreScreen.CLOUDFLARE -> {
-                SimpleScreen(
-                    title = "CLOUDFLARE",
-                    onBack = {
-                        currentScreen = GTStoreScreen.DASHBOARD
-                    }
-                )
+                BackGestureScreen(
+                    onBack = goBack
+                ) {
+                    SimpleScreen(
+                        title = "CLOUDFLARE",
+                        onBack = goBack
+                    )
+                }
             }
 
             GTStoreScreen.GITHUB -> {
-                SimpleScreen(
-                    title = "GITHUB",
-                    onBack = {
-                        currentScreen = GTStoreScreen.DASHBOARD
-                    }
-                )
+                BackGestureScreen(
+                    onBack = goBack
+                ) {
+                    SimpleScreen(
+                        title = "GITHUB",
+                        onBack = goBack
+                    )
+                }
             }
 
             GTStoreScreen.DOWNLOADS -> {
-                SimpleScreen(
-                    title = "DOWNLOADS",
-                    onBack = {
-                        currentScreen = GTStoreScreen.DASHBOARD
-                    }
-                )
+                BackGestureScreen(
+                    onBack = goBack
+                ) {
+                    SimpleScreen(
+                        title = "DOWNLOADS",
+                        onBack = goBack
+                    )
+                }
             }
 
             GTStoreScreen.CONFIGURACOES -> {
-                SimpleScreen(
-                    title = "CONFIGURAÇÕES",
-                    onBack = {
-                        currentScreen = GTStoreScreen.DASHBOARD
-                    }
-                )
+                BackGestureScreen(
+                    onBack = goBack
+                ) {
+                    SimpleScreen(
+                        title = "CONFIGURAÇÕES",
+                        onBack = goBack
+                    )
+                }
             }
 
             GTStoreScreen.LOGS -> {
-                SimpleScreen(
-                    title = "LOGS",
-                    onBack = {
-                        currentScreen = GTStoreScreen.DASHBOARD
+                BackGestureScreen(
+                    onBack = goBack
+                ) {
+                    SimpleScreen(
+                        title = "LOGS",
+                        onBack = goBack
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BackGestureScreen(
+    onBack: () -> Unit,
+    content: @Composable () -> Unit
+) {
+
+    var totalDrag by remember {
+        mutableStateOf(0f)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+
+                detectHorizontalDragGestures(
+                    onDragStart = {
+                        totalDrag = 0f
+                    },
+                    onHorizontalDrag = { _, dragAmount ->
+
+                        totalDrag += dragAmount
+
+                        if (totalDrag < -150f) {
+                            onBack()
+                            totalDrag = 0f
+                        }
+                    },
+                    onDragEnd = {
+                        totalDrag = 0f
+                    },
+                    onDragCancel = {
+                        totalDrag = 0f
                     }
                 )
             }
-        }
+    ) {
+        content()
     }
 }
 
@@ -381,26 +443,10 @@ fun FilesScreen(
             .padding(16.dp)
     ) {
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-
-            Button(
-                onClick = onBack
-            ) {
-                Text("VOLTAR")
-            }
-
-            Spacer(
-                modifier = Modifier.width(12.dp)
-            )
-
-            Text(
-                text = "ARQUIVOS",
-                style = MaterialTheme.typography.headlineMedium
-            )
-        }
+        Text(
+            text = "ARQUIVOS",
+            style = MaterialTheme.typography.headlineMedium
+        )
 
         Spacer(
             modifier = Modifier.height(16.dp)
@@ -415,13 +461,26 @@ fun FilesScreen(
                 modifier = Modifier.padding(16.dp)
             ) {
 
-                Text(
-                    text = "ARMAZENAMENTO",
-                    style = MaterialTheme.typography.titleMedium
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+
+                    Text(
+                        text = "ARMAZENAMENTO",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    Button(
+                        onClick = onBack
+                    ) {
+                        Text("VOLTAR")
+                    }
+                }
 
                 Spacer(
-                    modifier = Modifier.height(8.dp)
+                    modifier = Modifier.height(12.dp)
                 )
 
                 Text(
@@ -614,6 +673,5 @@ fun SimpleScreen(
         }
     }
 }
-
 
 
