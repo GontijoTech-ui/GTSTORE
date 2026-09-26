@@ -4,6 +4,26 @@ import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 
+enum class PackageChangeType {
+    ADDED,
+    REMOVED,
+    CHANGED,
+    UNCHANGED
+}
+
+data class PackageChange(
+    val type: PackageChangeType,
+    val packageItem: CatalogPackage
+)
+
+data class CatalogSyncResult(
+    val current: List<CatalogPackage>,
+    val added: List<CatalogPackage>,
+    val removed: List<CatalogPackage>,
+    val changed: List<CatalogPackage>,
+    val unchanged: List<CatalogPackage>
+)
+
 data class CatalogPackage(
     val id: String,
     val name: String,
@@ -25,6 +45,7 @@ object PackageCatalog {
         context: Context,
         packages: List<CatalogPackage>
     ) {
+
         val array = JSONArray()
 
         packages.forEach { pkg ->
@@ -80,7 +101,8 @@ object PackageCatalog {
 
                 for (index in 0 until array.length()) {
 
-                    val item = array.getJSONObject(index)
+                    val item =
+                        array.getJSONObject(index)
 
                     add(
                         CatalogPackage(
@@ -111,6 +133,106 @@ object PackageCatalog {
 
             emptyList()
         }
+    }
+
+    fun synchronize(
+        context: Context,
+        currentPackages: List<CatalogPackage>
+    ): CatalogSyncResult {
+
+        val previousPackages =
+            load(context)
+
+        val previousByKey =
+            previousPackages.associateBy {
+                catalogKey(it)
+            }
+
+        val currentByKey =
+            currentPackages.associateBy {
+                catalogKey(it)
+            }
+
+        val added =
+            mutableListOf<CatalogPackage>()
+
+        val removed =
+            mutableListOf<CatalogPackage>()
+
+        val changed =
+            mutableListOf<CatalogPackage>()
+
+        val unchanged =
+            mutableListOf<CatalogPackage>()
+
+        for (current in currentPackages) {
+
+            val key =
+                catalogKey(current)
+
+            val previous =
+                previousByKey[key]
+
+            if (previous == null) {
+
+                added.add(current)
+
+            } else if (
+                hasChanged(
+                    previous,
+                    current
+                )
+            ) {
+
+                changed.add(current)
+
+            } else {
+
+                unchanged.add(current)
+            }
+        }
+
+        for (previous in previousPackages) {
+
+            val key =
+                catalogKey(previous)
+
+            if (!currentByKey.containsKey(key)) {
+
+                removed.add(previous)
+            }
+        }
+
+        save(
+            context,
+            currentPackages
+        )
+
+        return CatalogSyncResult(
+            current = currentPackages,
+            added = added,
+            removed = removed,
+            changed = changed,
+            unchanged = unchanged
+        )
+    }
+
+    private fun catalogKey(
+        pkg: CatalogPackage
+    ): String {
+
+        return pkg.path
+    }
+
+    private fun hasChanged(
+        previous: CatalogPackage,
+        current: CatalogPackage
+    ): Boolean {
+
+        return previous.size != current.size ||
+            previous.modified != current.modified ||
+            previous.name != current.name ||
+            previous.file != current.file
     }
 }
 
