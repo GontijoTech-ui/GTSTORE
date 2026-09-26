@@ -2,7 +2,7 @@ name: Compilar APK GTSTORE
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   workflow_dispatch:
 
 jobs:
@@ -16,8 +16,8 @@ jobs:
       - name: Configurar Java JDK 17
         uses: actions/setup-java@v5
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          java-version: "17"
+          distribution: "temurin"
 
       - name: Configurar Android SDK
         uses: android-actions/setup-android@v4
@@ -25,21 +25,26 @@ jobs:
       - name: Configurar Gradle 8.2.1
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.2.1'
+          gradle-version: "8.2.1"
 
       - name: Criar Gradle Wrapper
         run: |
           gradle wrapper --gradle-version 8.2.1
           chmod +x gradlew
 
-      - name: Baixar binário Cloudflared (ARM64)
+      - name: Baixar Cloudflared oficial
         run: |
           mkdir -p app/src/main/assets
-          curl -L -o app/src/main/assets/cloudflared \
-            https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64
+
+          curl -fL \
+            -o app/src/main/assets/cloudflared \
+            https://github.com/cloudflare/cloudflared/releases/download/2026.9.3/cloudflared-linux-arm64
+
+          echo "39f23e7c55ce2c2e502a0b3e070b978bf69135b19246b5b7581dadb94cf2144d  app/src/main/assets/cloudflared" | sha256sum -c -
+
           chmod +x app/src/main/assets/cloudflared
 
-      - name: Compilar APK (Debug)
+      - name: Compilar APK Debug
         run: ./gradlew assembleDebug
 
       - name: Disponibilizar APK para Download
@@ -47,3 +52,4 @@ jobs:
         with:
           name: GTSTORE-App-Debug
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
