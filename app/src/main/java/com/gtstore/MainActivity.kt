@@ -1,11 +1,11 @@
 package com.gtstore
 
+import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.os.StatFs
-import android.provider.DocumentsContract
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,28 +17,25 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
 import com.gtstore.ui.theme.GTStoreTheme
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 enum class GTStoreScreen {
@@ -53,15 +50,20 @@ enum class GTStoreScreen {
 }
 
 data class PackageItem(
+    val id: String,
     val name: String,
+    val file: String,
+    val path: String,
+    val sizeBytes: Long,
     val size: String,
+    val modified: Long,
     val version: String
 )
 
 data class StorageInfo(
-    val total: String,
-    val used: String,
-    val free: String
+    val total: Long,
+    val used: Long,
+    val free: Long
 )
 
 class MainActivity : ComponentActivity() {
@@ -76,21 +78,22 @@ class MainActivity : ComponentActivity() {
             if (uri != null) {
 
                 try {
+
                     contentResolver.takePersistableUriPermission(
                         uri,
                         Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                                Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                            Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                     )
+
                 } catch (_: Exception) {
-                    contentResolver.takePersistableUriPermission(
-                        uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION
-                    )
                 }
 
                 getPreferences(MODE_PRIVATE)
                     .edit()
-                    .putString("pkg_folder_uri", uri.toString())
+                    .putString(
+                        "pkg_folder_uri",
+                        uri.toString()
+                    )
                     .apply()
 
                 selectedFolderUri = uri
@@ -100,15 +103,21 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val savedUri = getPreferences(MODE_PRIVATE)
-            .getString("pkg_folder_uri", null)
+        val savedUri =
+            getPreferences(MODE_PRIVATE)
+                .getString(
+                    "pkg_folder_uri",
+                    null
+                )
 
-        if (savedUri != null) {
+        if (!savedUri.isNullOrBlank()) {
             selectedFolderUri = Uri.parse(savedUri)
         }
 
         setContent {
+
             GTStoreTheme {
+
                 GTStoreApp(
                     selectedFolderUri = selectedFolderUri,
                     onSelectFolder = {
@@ -127,83 +136,65 @@ fun GTStoreApp(
 ) {
 
     var currentScreen by remember {
-        mutableStateOf(GTStoreScreen.DASHBOARD)
+        mutableStateOf(
+            GTStoreScreen.DASHBOARD
+        )
     }
 
-    val goBack = {
-        currentScreen = GTStoreScreen.DASHBOARD
-    }
+    when (currentScreen) {
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
+        GTStoreScreen.DASHBOARD -> {
 
-        when (currentScreen) {
+            Dashboard(
+                onNavigate = {
+                    currentScreen = it
+                }
+            )
+        }
 
-            GTStoreScreen.DASHBOARD -> {
-                Dashboard(
-                    onNavigate = {
-                        currentScreen = it
-                    }
-                )
-            }
+        GTStoreScreen.ARQUIVOS -> {
 
-            GTStoreScreen.SERVIDOR -> {
-                SimpleScreen(
-                    title = "SERVIDOR",
-                    description = "Gerenciamento do servidor GTSTORE.",
-                    onBack = goBack
-                )
-            }
+            FilesScreen(
+                selectedFolderUri = selectedFolderUri,
+                onSelectFolder = onSelectFolder,
+                onBack = {
+                    currentScreen =
+                        GTStoreScreen.DASHBOARD
+                }
+            )
+        }
 
-            GTStoreScreen.ARQUIVOS -> {
-                FilesScreen(
-                    selectedFolderUri = selectedFolderUri,
-                    onSelectFolder = onSelectFolder,
-                    onBack = goBack
-                )
-            }
+        else -> {
 
-            GTStoreScreen.CLOUDFLARE -> {
-                SimpleScreen(
-                    title = "CLOUDFLARE",
-                    description = "Configuração da conexão pública.",
-                    onBack = goBack
-                )
-            }
+            SimpleScreen(
+                title = when (currentScreen) {
 
-            GTStoreScreen.GITHUB -> {
-                SimpleScreen(
-                    title = "GITHUB",
-                    description = "Sincronização do catálogo e configurações.",
-                    onBack = goBack
-                )
-            }
+                    GTStoreScreen.SERVIDOR ->
+                        "SERVIDOR"
 
-            GTStoreScreen.DOWNLOADS -> {
-                SimpleScreen(
-                    title = "DOWNLOADS",
-                    description = "Downloads ativos e histórico.",
-                    onBack = goBack
-                )
-            }
+                    GTStoreScreen.CLOUDFLARE ->
+                        "CLOUDFLARE"
 
-            GTStoreScreen.CONFIGURACOES -> {
-                SimpleScreen(
-                    title = "CONFIGURAÇÕES",
-                    description = "Configurações gerais do GTSTORE.",
-                    onBack = goBack
-                )
-            }
+                    GTStoreScreen.GITHUB ->
+                        "GITHUB"
 
-            GTStoreScreen.LOGS -> {
-                SimpleScreen(
-                    title = "LOGS",
-                    description = "Eventos e registros do aplicativo.",
-                    onBack = goBack
-                )
-            }
+                    GTStoreScreen.DOWNLOADS ->
+                        "DOWNLOADS"
+
+                    GTStoreScreen.CONFIGURACOES ->
+                        "CONFIGURAÇÕES"
+
+                    GTStoreScreen.LOGS ->
+                        "LOGS"
+
+                    else ->
+                        "GTSTORE"
+                },
+                onBack = {
+                    currentScreen =
+                        GTStoreScreen.DASHBOARD
+                }
+            )
         }
     }
 }
@@ -213,198 +204,157 @@ fun Dashboard(
     onNavigate: (GTStoreScreen) -> Unit
 ) {
 
-    Column(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
 
-        Text(
-            text = "GTSTORE",
-            style = MaterialTheme.typography.headlineLarge
-        )
-
-        Spacer(
-            modifier = Modifier.height(16.dp)
-        )
-
-        StatusCard(
-            title = "SERVIDOR",
-            status = "● ONLINE"
-        )
-
-        Spacer(
-            modifier = Modifier.height(8.dp)
-        )
-
-        PinCard()
-
-        Spacer(
-            modifier = Modifier.height(8.dp)
-        )
-
-        StatusCard(
-            title = "HD",
-            status = "● AGUARDANDO"
-        )
-
-        Spacer(
-            modifier = Modifier.height(8.dp)
-        )
-
-        StatusCard(
-            title = "CLOUDFLARE",
-            status = "● AGUARDANDO"
-        )
-
-        Spacer(
-            modifier = Modifier.height(8.dp)
-        )
-
-        StatusCard(
-            title = "GITHUB",
-            status = "● AGUARDANDO"
-        )
-
-        Spacer(
-            modifier = Modifier.height(16.dp)
-        )
-
-        DashboardRow(
-            leftText = "SERVIDOR",
-            rightText = "ARQUIVOS",
-            leftAction = {
-                onNavigate(GTStoreScreen.SERVIDOR)
-            },
-            rightAction = {
-                onNavigate(GTStoreScreen.ARQUIVOS)
-            }
-        )
-
-        Spacer(
-            modifier = Modifier.height(8.dp)
-        )
-
-        DashboardRow(
-            leftText = "CLOUDFLARE",
-            rightText = "GITHUB",
-            leftAction = {
-                onNavigate(GTStoreScreen.CLOUDFLARE)
-            },
-            rightAction = {
-                onNavigate(GTStoreScreen.GITHUB)
-            }
-        )
-
-        Spacer(
-            modifier = Modifier.height(8.dp)
-        )
-
-        DashboardRow(
-            leftText = "DOWNLOADS",
-            rightText = "CONFIGURAÇÕES",
-            leftAction = {
-                onNavigate(GTStoreScreen.DOWNLOADS)
-            },
-            rightAction = {
-                onNavigate(GTStoreScreen.CONFIGURACOES)
-            }
-        )
-
-        Spacer(
-            modifier = Modifier.height(12.dp)
-        )
-
-        Text(
-            text = "Arquivos: 0 • Downloads ativos: 0"
-        )
-
-        Spacer(
-            modifier = Modifier.height(8.dp)
-        )
-
-        Button(
-            onClick = {
-                onNavigate(GTStoreScreen.LOGS)
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("LOGS")
-        }
-    }
-}
-
-@Composable
-fun PinCard() {
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        item {
 
             Text(
-                text = "PIN DE HOJE",
-                style = MaterialTheme.typography.labelLarge
-            )
-
-            Spacer(
-                modifier = Modifier.height(4.dp)
-            )
-
-            Text(
-                text = "483721",
+                text = "GTSTORE",
                 style = MaterialTheme.typography.headlineMedium
             )
+        }
 
-            Spacer(
-                modifier = Modifier.height(4.dp)
-            )
+        item {
 
             Text(
-                text = "Válido até 23:59:59"
+                text = "Painel principal",
+                style = MaterialTheme.typography.bodyLarge
             )
         }
-    }
-}
 
-@Composable
-fun DashboardRow(
-    leftText: String,
-    rightText: String,
-    leftAction: () -> Unit,
-    rightAction: () -> Unit
-) {
+        item {
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-
-        Button(
-            onClick = leftAction,
-            modifier = Modifier
-                .weight(1f)
-                .height(50.dp),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Text(leftText)
+            StatusCard(
+                title = "SERVIDOR",
+                status = "OFFLINE"
+            )
         }
 
-        Button(
-            onClick = rightAction,
-            modifier = Modifier
-                .weight(1f)
-                .height(50.dp),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Text(rightText)
+        item {
+
+            StatusCard(
+                title = "ARMAZENAMENTO",
+                status = "VERIFICAR"
+            )
+        }
+
+        item {
+
+            StatusCard(
+                title = "CLOUDFLARE",
+                status = "AGUARDANDO"
+            )
+        }
+
+        item {
+
+            StatusCard(
+                title = "GITHUB",
+                status = "AGUARDANDO"
+            )
+        }
+
+        item {
+
+            Button(
+                onClick = {
+                    onNavigate(
+                        GTStoreScreen.SERVIDOR
+                    )
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("SERVIDOR")
+            }
+        }
+
+        item {
+
+            Button(
+                onClick = {
+                    onNavigate(
+                        GTStoreScreen.ARQUIVOS
+                    )
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("ARQUIVOS")
+            }
+        }
+
+        item {
+
+            Button(
+                onClick = {
+                    onNavigate(
+                        GTStoreScreen.CLOUDFLARE
+                    )
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("CLOUDFLARE")
+            }
+        }
+
+        item {
+
+            Button(
+                onClick = {
+                    onNavigate(
+                        GTStoreScreen.GITHUB
+                    )
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("GITHUB")
+            }
+        }
+
+        item {
+
+            Button(
+                onClick = {
+                    onNavigate(
+                        GTStoreScreen.DOWNLOADS
+                    )
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("DOWNLOADS")
+            }
+        }
+
+        item {
+
+            Button(
+                onClick = {
+                    onNavigate(
+                        GTStoreScreen.CONFIGURACOES
+                    )
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("CONFIGURAÇÕES")
+            }
+        }
+
+        item {
+
+            Button(
+                onClick = {
+                    onNavigate(
+                        GTStoreScreen.LOGS
+                    )
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("LOGS")
+            }
         }
     }
 }
@@ -421,7 +371,9 @@ fun FilesScreen(
     }
 
     var packages by remember {
-        mutableStateOf<List<PackageItem>>(emptyList())
+        mutableStateOf(
+            emptyList<PackageItem>()
+        )
     }
 
     var storageInfo by remember {
@@ -437,7 +389,7 @@ fun FilesScreen(
     }
 
     var refreshCounter by remember {
-        mutableStateOf(0)
+        mutableIntStateOf(0)
     }
 
     LaunchedEffect(
@@ -445,208 +397,251 @@ fun FilesScreen(
         refreshCounter
     ) {
 
-        if (selectedFolderUri != null) {
-
-            scanning = true
-
-            packages = scanPackages(
-                selectedFolderUri
-            )
-
-            storageInfo = getStorageInfo(
-                selectedFolderUri
-            )
-
-            lastScan = SimpleDateFormat(
-                "dd/MM/yyyy HH:mm:ss",
-                Locale.getDefault()
-            ).format(Date())
-
-            scanning = false
-
-        } else {
+        if (selectedFolderUri == null) {
 
             packages = emptyList()
             storageInfo = null
             lastScan = ""
+            return@LaunchedEffect
         }
-    }
 
-    val filteredPackages = packages.filter { packageItem ->
+        scanning = true
 
-        packageItem.name.contains(
-            searchText,
-            ignoreCase = true
+        packages = scanPackages(
+            selectedFolderUri
         )
+
+        PackageCatalog.save(
+            GTStoreApplication.context,
+            packages.map { pkg ->
+
+                CatalogPackage(
+                    id = pkg.id,
+                    name = pkg.name,
+                    file = pkg.file,
+                    path = pkg.path,
+                    size = pkg.sizeBytes,
+                    modified = pkg.modified,
+                    version = pkg.version
+                )
+            }
+        )
+
+        storageInfo =
+            getStorageInfo(
+                selectedFolderUri
+            )
+
+        lastScan =
+            java.text.SimpleDateFormat(
+                "dd/MM/yyyy HH:mm:ss",
+                Locale.getDefault()
+            ).format(
+                java.util.Date()
+            )
+
+        scanning = false
     }
 
-    Column(
+    val filteredPackages =
+        packages.filter { pkg ->
+
+            pkg.name.contains(
+                searchText,
+                ignoreCase = true
+            )
+        }
+
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
 
-        Text(
-            text = "ARQUIVOS",
-            style = MaterialTheme.typography.headlineMedium
-        )
+        item {
 
-        Spacer(
-            modifier = Modifier.height(16.dp)
-        )
+            Text(
+                text = "ARQUIVOS",
+                style = MaterialTheme.typography.headlineMedium
+            )
+        }
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp)
-        ) {
+        item {
 
-            Column(
-                modifier = Modifier.padding(16.dp)
+            Card(
+                modifier = Modifier.fillMaxWidth()
             ) {
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement =
+                        Arrangement.spacedBy(6.dp)
                 ) {
 
                     Text(
                         text = "ARMAZENAMENTO",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.weight(1f)
+                        style = MaterialTheme.typography.titleLarge
                     )
 
-                    Button(
-                        onClick = onBack
-                    ) {
-                        Text("VOLTAR")
-                    }
-                }
-
-                Spacer(
-                    modifier = Modifier.height(12.dp)
-                )
-
-                if (selectedFolderUri == null) {
-
-                    Text(
-                        text = "Nenhuma pasta selecionada."
-                    )
-
-                    Spacer(
-                        modifier = Modifier.height(12.dp)
-                    )
-
-                    Button(
-                        onClick = onSelectFolder,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("SELECIONAR PASTA DO HD")
-                    }
-
-                } else {
-
-                    Text(
-                        text = "HD: CONECTADO"
-                    )
-
-                    Spacer(
-                        modifier = Modifier.height(4.dp)
-                    )
-
-                    if (storageInfo != null) {
+                    if (selectedFolderUri == null) {
 
                         Text(
-                            text = "Capacidade: ${storageInfo!!.total}"
+                            text = "Nenhuma pasta selecionada."
                         )
+
+                    } else {
 
                         Text(
-                            text = "Usado: ${storageInfo!!.used}"
+                            text = "HD: CONECTADO"
                         )
 
-                        Text(
-                            text = "Livre: ${storageInfo!!.free}"
-                        )
-                    }
+                        storageInfo?.let { info ->
 
-                    Spacer(
-                        modifier = Modifier.height(4.dp)
-                    )
+                            Text(
+                                text =
+                                    "Capacidade: ${
+                                        formatFileSize(
+                                            info.total
+                                        )
+                                    }"
+                            )
 
-                    Text(
-                        text = if (scanning) {
-                            "Procurando PKGs..."
-                        } else {
-                            "PKGs encontrados: ${packages.size}"
+                            Text(
+                                text =
+                                    "Usado: ${
+                                        formatFileSize(
+                                            info.used
+                                        )
+                                    }"
+                            )
+
+                            Text(
+                                text =
+                                    "Livre: ${
+                                        formatFileSize(
+                                            info.free
+                                        )
+                                    }"
+                            )
                         }
-                    )
-
-                    if (lastScan.isNotEmpty()) {
 
                         Text(
-                            text = "Última verificação: $lastScan"
+                            text =
+                                "PKGs encontrados: ${packages.size}"
                         )
+
+                        if (lastScan.isNotBlank()) {
+
+                            Text(
+                                text =
+                                    "Última verificação: $lastScan"
+                            )
+                        }
                     }
 
                     Spacer(
-                        modifier = Modifier.height(12.dp)
+                        modifier = Modifier.height(8.dp)
                     )
 
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier.fillMaxWidth()
                     ) {
 
                         Button(
                             onClick = {
                                 refreshCounter++
                             },
-                            modifier = Modifier.weight(1f)
+                            enabled =
+                                selectedFolderUri != null &&
+                                    !scanning
                         ) {
-                            Text("ATUALIZAR")
+                            Text(
+                                if (scanning)
+                                    "VERIFICANDO..."
+                                else
+                                    "ATUALIZAR"
+                            )
                         }
 
+                        Spacer(
+                            modifier = Modifier.width(8.dp)
+                        )
+
                         Button(
-                            onClick = onSelectFolder,
-                            modifier = Modifier.weight(1f)
+                            onClick = onSelectFolder
                         ) {
                             Text("ALTERAR PASTA")
                         }
+                    }
+
+                    Spacer(
+                        modifier = Modifier.height(4.dp)
+                    )
+
+                    Button(
+                        onClick = onBack,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("VOLTAR")
                     }
                 }
             }
         }
 
-        Spacer(
-            modifier = Modifier.height(12.dp)
-        )
+        if (selectedFolderUri != null) {
 
-        OutlinedTextField(
-            value = searchText,
-            onValueChange = {
-                searchText = it
-            },
-            modifier = Modifier.fillMaxWidth(),
-            label = {
-                Text("Pesquisar arquivos")
-            },
-            singleLine = true
-        )
+            item {
 
-        Spacer(
-            modifier = Modifier.height(12.dp)
-        )
-
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-
-            items(filteredPackages) { packageItem ->
-
-                PackageCard(
-                    packageItem = packageItem
+                OutlinedTextField(
+                    value = searchText,
+                    onValueChange = {
+                        searchText = it
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = {
+                        Text("Pesquisar PKG")
+                    },
+                    singleLine = true
                 )
             }
+        }
+
+        if (
+            selectedFolderUri != null &&
+            filteredPackages.isEmpty() &&
+            !scanning
+        ) {
+
+            item {
+
+                Card(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+
+                    Text(
+                        text =
+                            if (searchText.isBlank())
+                                "Nenhum arquivo .pkg encontrado."
+                            else
+                                "Nenhum PKG corresponde à pesquisa.",
+                        modifier =
+                            Modifier.padding(16.dp)
+                    )
+                }
+            }
+        }
+
+        items(
+            items = filteredPackages,
+            key = {
+                it.id
+            }
+        ) { pkg ->
+
+            PackageCard(
+                pkg = pkg
+            )
         }
     }
 }
@@ -655,14 +650,16 @@ fun scanPackages(
     folderUri: Uri
 ): List<PackageItem> {
 
-    val result = mutableListOf<PackageItem>()
+    val result =
+        mutableListOf<PackageItem>()
 
     return try {
 
-        val root = DocumentFile.fromTreeUri(
-            GTStoreApplication.context,
-            folderUri
-        )
+        val root =
+            DocumentFile.fromTreeUri(
+                GTStoreApplication.context,
+                folderUri
+            )
 
         if (root != null) {
 
@@ -673,7 +670,9 @@ fun scanPackages(
         }
 
         result.sortedBy {
-            it.name.lowercase(Locale.getDefault())
+            it.name.lowercase(
+                Locale.getDefault()
+            )
         }
 
     } catch (_: Exception) {
@@ -699,25 +698,59 @@ fun scanDocumentTree(
         } else if (
             file.isFile &&
             file.name
-                ?.lowercase(Locale.getDefault())
+                ?.lowercase(
+                    Locale.getDefault()
+                )
                 ?.endsWith(".pkg") == true
         ) {
 
-            val fileName = file.name ?: "PKG"
+            val fileName =
+                file.name ?: "PKG"
 
-            val size = formatFileSize(
+            val modified =
+                file.lastModified()
+
+            val size =
                 file.length()
-            )
+
+            val id =
+                buildPackageId(
+                    name = fileName,
+                    size = size,
+                    modified = modified
+                )
 
             result.add(
                 PackageItem(
+                    id = id,
                     name = fileName,
-                    size = size,
-                    version = "Detectar"
+                    file = fileName,
+                    path = file.uri.toString(),
+                    sizeBytes = size,
+                    size = formatFileSize(size),
+                    modified = modified,
+                    version = ""
                 )
             )
         }
     }
+}
+
+fun buildPackageId(
+    name: String,
+    size: Long,
+    modified: Long
+): String {
+
+    return "$name-$size-$modified"
+        .lowercase(
+            Locale.getDefault()
+        )
+        .replace(
+            Regex("[^a-z0-9]+"),
+            "-"
+        )
+        .trim('-')
 }
 
 fun getStorageInfo(
@@ -727,46 +760,50 @@ fun getStorageInfo(
     return try {
 
         val documentId =
-            DocumentsContract.getTreeDocumentId(
-                folderUri
-            )
+            android.provider.DocumentsContract
+                .getTreeDocumentId(folderUri)
 
         val volumeName =
-            documentId.substringBefore(":")
+            android.provider.DocumentsContract
+                .getTreeDocumentId(folderUri)
+                ?.substringBefore(":")
 
-        val path = if (
-            volumeName.equals(
-                "primary",
-                ignoreCase = true
-            )
-        ) {
+        val path =
+            if (
+                volumeName.equals(
+                    "primary",
+                    ignoreCase = true
+                )
+            ) {
 
-            Environment
-                .getExternalStorageDirectory()
-                .absolutePath
+                Environment
+                    .getExternalStorageDirectory()
+                    .absolutePath
 
-        } else {
+            } else {
 
-            "/storage/$volumeName"
-        }
+                "/storage/$volumeName"
+            }
 
-        val statFs = StatFs(path)
+        val statFs =
+            StatFs(path)
 
-        val totalBytes =
-            statFs.blockCountLong *
-                    statFs.blockSizeLong
+        val blockSize =
+            statFs.blockSizeLong
 
-        val freeBytes =
-            statFs.availableBlocksLong *
-                    statFs.blockSizeLong
+        val total =
+            statFs.blockCountLong * blockSize
 
-        val usedBytes =
-            totalBytes - freeBytes
+        val free =
+            statFs.availableBlocksLong * blockSize
+
+        val used =
+            total - free
 
         StorageInfo(
-            total = formatFileSize(totalBytes),
-            used = formatFileSize(usedBytes),
-            free = formatFileSize(freeBytes)
+            total = total,
+            used = used,
+            free = free
         )
 
     } catch (_: Exception) {
@@ -779,82 +816,87 @@ fun formatFileSize(
     bytes: Long
 ): String {
 
-    if (bytes <= 0) {
-        return "0 B"
+    if (bytes < 1024) {
+        return "$bytes B"
     }
 
-    val units = arrayOf(
-        "B",
-        "KB",
-        "MB",
-        "GB",
-        "TB"
-    )
+    val kb =
+        bytes / 1024.0
 
-    var value = bytes.toDouble()
-    var index = 0
-
-    while (
-        value >= 1024 &&
-        index < units.lastIndex
-    ) {
-
-        value /= 1024
-        index++
-    }
-
-    return if (index == 0) {
-
-        "${value.toLong()} ${units[index]}"
-
-    } else {
-
-        String.format(
-            Locale.US,
-            "%.2f %s",
-            value,
-            units[index]
+    if (kb < 1024) {
+        return String.format(
+            Locale.getDefault(),
+            "%.2f KB",
+            kb
         )
     }
+
+    val mb =
+        kb / 1024.0
+
+    if (mb < 1024) {
+        return String.format(
+            Locale.getDefault(),
+            "%.2f MB",
+            mb
+        )
+    }
+
+    val gb =
+        mb / 1024.0
+
+    if (gb < 1024) {
+        return String.format(
+            Locale.getDefault(),
+            "%.2f GB",
+            gb
+        )
+    }
+
+    val tb =
+        gb / 1024.0
+
+    return String.format(
+        Locale.getDefault(),
+        "%.2f TB",
+        tb
+    )
 }
 
 @Composable
 fun PackageCard(
-    packageItem: PackageItem
+    pkg: PackageItem
 ) {
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp)
+        modifier = Modifier.fillMaxWidth()
     ) {
 
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement =
+                Arrangement.spacedBy(4.dp)
         ) {
 
             Text(
-                text = packageItem.name,
-                style = MaterialTheme.typography.titleMedium
-            )
-
-            Spacer(
-                modifier = Modifier.height(4.dp)
+                text = pkg.name,
+                style =
+                    MaterialTheme.typography.titleMedium
             )
 
             Text(
-                text = "Tamanho: ${packageItem.size}"
+                text = "Tamanho: ${pkg.size}"
             )
+
+            if (pkg.version.isNotBlank()) {
+
+                Text(
+                    text = "Versão: ${pkg.version}"
+                )
+            }
 
             Text(
-                text = "Versão: ${packageItem.version}"
-            )
-
-            Spacer(
-                modifier = Modifier.height(8.dp)
-            )
-
-            Text(
-                text = "● DISPONÍVEL"
+                text = "Tipo: PKG"
             )
         }
     }
@@ -867,21 +909,21 @@ fun StatusCard(
 ) {
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp)
+        modifier = Modifier.fillMaxWidth()
     ) {
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            horizontalArrangement =
+                Arrangement.SpaceBetween
         ) {
 
             Text(
                 text = title,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleSmall
+                style =
+                    MaterialTheme.typography.titleMedium
             )
 
             Text(
@@ -894,48 +936,35 @@ fun StatusCard(
 @Composable
 fun SimpleScreen(
     title: String,
-    description: String,
     onBack: () -> Unit
 ) {
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .padding(16.dp),
+        verticalArrangement =
+            Arrangement.spacedBy(16.dp)
     ) {
 
         Text(
-            text = "GTSTORE",
-            style = MaterialTheme.typography.headlineLarge
-        )
-
-        Spacer(
-            modifier = Modifier.height(16.dp)
-        )
-
-        Text(
             text = title,
-            style = MaterialTheme.typography.headlineMedium
-        )
-
-        Spacer(
-            modifier = Modifier.height(16.dp)
+            style =
+                MaterialTheme.typography.headlineMedium
         )
 
         Text(
-            text = description
-        )
-
-        Spacer(
-            modifier = Modifier.height(24.dp)
+            text = "Módulo em desenvolvimento."
         )
 
         Button(
-            onClick = onBack
+            onClick = onBack,
+            modifier = Modifier.fillMaxWidth()
         ) {
             Text("VOLTAR")
         }
     }
 }
+
+
+
