@@ -25,6 +25,10 @@ class GTStoreService : Service() {
             "com.gtstore.action.STOP_SERVER"
     }
 
+    private val httpServer: HttpServer
+        get() =
+            (application as GTStoreApplication).httpServer
+
     override fun onCreate() {
         super.onCreate()
 
@@ -41,9 +45,16 @@ class GTStoreService : Service() {
 
             ACTION_STOP -> {
 
-                stopForeground(
-                    STOP_FOREGROUND_REMOVE
-                )
+                httpServer.stop()
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(
+                        STOP_FOREGROUND_REMOVE
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    stopForeground(true)
+                }
 
                 stopSelf()
 
@@ -60,14 +71,26 @@ class GTStoreService : Service() {
                     NOTIFICATION_ID,
                     notification
                 )
+
+                /*
+                 * O servidor HTTP agora pertence ao
+                 * serviço e pode continuar funcionando
+                 * mesmo quando a Activity for destruída.
+                 */
+                if (!httpServer.getStatus().running) {
+                    httpServer.start()
+                }
             }
         }
 
-        /*
-         * Se o Android encerrar o processo do serviço,
-         * solicita que ele seja recriado posteriormente.
-         */
         return START_STICKY
+    }
+
+    override fun onDestroy() {
+
+        httpServer.stop()
+
+        super.onDestroy()
     }
 
     private fun buildNotification(): Notification {
@@ -95,6 +118,7 @@ class GTStoreService : Service() {
 
         } else {
 
+            @Suppress("DEPRECATION")
             Notification.Builder(this)
                 .setContentTitle(
                     "GTSTORE"
