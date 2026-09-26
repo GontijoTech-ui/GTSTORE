@@ -533,117 +533,38 @@ class HttpServer(
 
     private fun buildPs4TestPage(): String {
 
-        return """
-            <!DOCTYPE html>
-            <html>
-            <head>
+    return """
+        <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+        "http://www.w3.org/TR/html4/strict.dtd">
 
-                <meta charset="utf-8">
+        <html>
+        <head>
+            <title>GTSTORE</title>
+        </head>
 
-                <title>GTSTORE PS4</title>
+        <body>
 
-                <style>
+            <h1>GTSTORE</h1>
 
-                    body {
-                        background: #111;
-                        color: #fff;
-                        font-family: Arial, sans-serif;
-                        margin: 0;
-                        padding: 30px;
-                    }
+            <p>Servidor funcionando.</p>
 
-                    h1 {
-                        font-size: 32px;
-                        margin-bottom: 10px;
-                    }
+            <p>TESTE PS4</p>
 
-                    .status {
-                        font-size: 20px;
-                        margin-bottom: 30px;
-                    }
+            <p>
+                <a href="/api/status">
+                    TESTAR STATUS
+                </a>
+            </p>
 
-                    .box {
-                        border: 1px solid #555;
-                        padding: 20px;
-                        margin-bottom: 20px;
-                    }
+            <p>
+                <a href="/">
+                    VOLTAR
+                </a>
+            </p>
 
-                    a {
-                        display: block;
-                        background: #333;
-                        color: #fff;
-                        padding: 18px;
-                        margin-top: 15px;
-                        text-decoration: none;
-                        font-size: 20px;
-                    }
-
-                    a:hover {
-                        background: #444;
-                    }
-
-                </style>
-
-            </head>
-
-            <body>
-
-                <h1>GTSTORE</h1>
-
-                <div class="status">
-                    Servidor: ONLINE
-                </div>
-
-                <div class="box">
-
-                    <h2>Teste PS4</h2>
-
-                    <p>
-                        Esta página foi criada para testar
-                        a compatibilidade do navegador do PS4
-                        com o GTSTORE.
-                    </p>
-
-                    <p>
-                        JavaScript moderno não é necessário.
-                    </p>
-
-                    <a href="/api/status">
-                        TESTAR SERVIDOR
-                    </a>
-
-                    <a href="/api/packages">
-                        TESTAR CATÁLOGO
-                    </a>
-
-                    <a href="/">
-                        VOLTAR AO GTSTORE
-                    </a>
-
-                </div>
-
-            </body>
-            </html>
-        """.trimIndent()
-    }
-
-    private fun buildStatusJson(): String {
-
-        val ip =
-            getWifiIpv4Address()
-                ?.hostAddress
-                ?: "SEM WI-FI"
-
-        return """
-            {
-                "server": "GTSTORE",
-                "running": ${running.get()},
-                "port": $port,
-                "local_address": "$ip",
-                "network": "WIFI",
-                "active_connections": ${activeConnections.get()}
-            }
-        """.trimIndent()
+        </body>
+        </html>
+    """.trimIndent()
     }
 
     private fun buildPackagesJson(): String {
