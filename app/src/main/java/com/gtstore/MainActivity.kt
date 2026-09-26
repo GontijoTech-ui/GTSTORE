@@ -3,7 +3,6 @@ package com.gtstore
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,9 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -29,10 +25,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import com.gtstore.ui.theme.GTStoreTheme
-import kotlin.math.abs
 
 enum class GTStoreScreen {
     DASHBOARD,
@@ -90,123 +86,60 @@ fun GTStoreApp() {
                 )
             }
 
-            GTStoreScreen.ARQUIVOS -> {
-                BackGestureScreen(
+            GTStoreScreen.SERVIDOR -> {
+                SimpleScreen(
+                    title = "SERVIDOR",
+                    description = "Gerenciamento do servidor GTSTORE.",
                     onBack = goBack
-                ) {
-                    FilesScreen(
-                        onBack = goBack
-                    )
-                }
+                )
             }
 
-            GTStoreScreen.SERVIDOR -> {
-                BackGestureScreen(
+            GTStoreScreen.ARQUIVOS -> {
+                FilesScreen(
                     onBack = goBack
-                ) {
-                    SimpleScreen(
-                        title = "SERVIDOR",
-                        onBack = goBack
-                    )
-                }
+                )
             }
 
             GTStoreScreen.CLOUDFLARE -> {
-                BackGestureScreen(
+                SimpleScreen(
+                    title = "CLOUDFLARE",
+                    description = "Configuração da conexão pública.",
                     onBack = goBack
-                ) {
-                    SimpleScreen(
-                        title = "CLOUDFLARE",
-                        onBack = goBack
-                    )
-                }
+                )
             }
 
             GTStoreScreen.GITHUB -> {
-                BackGestureScreen(
+                SimpleScreen(
+                    title = "GITHUB",
+                    description = "Sincronização do catálogo e configurações.",
                     onBack = goBack
-                ) {
-                    SimpleScreen(
-                        title = "GITHUB",
-                        onBack = goBack
-                    )
-                }
+                )
             }
 
             GTStoreScreen.DOWNLOADS -> {
-                BackGestureScreen(
+                SimpleScreen(
+                    title = "DOWNLOADS",
+                    description = "Downloads ativos e histórico.",
                     onBack = goBack
-                ) {
-                    SimpleScreen(
-                        title = "DOWNLOADS",
-                        onBack = goBack
-                    )
-                }
+                )
             }
 
             GTStoreScreen.CONFIGURACOES -> {
-                BackGestureScreen(
+                SimpleScreen(
+                    title = "CONFIGURAÇÕES",
+                    description = "Configurações gerais do GTSTORE.",
                     onBack = goBack
-                ) {
-                    SimpleScreen(
-                        title = "CONFIGURAÇÕES",
-                        onBack = goBack
-                    )
-                }
+                )
             }
 
             GTStoreScreen.LOGS -> {
-                BackGestureScreen(
+                SimpleScreen(
+                    title = "LOGS",
+                    description = "Eventos e registros do aplicativo.",
                     onBack = goBack
-                ) {
-                    SimpleScreen(
-                        title = "LOGS",
-                        onBack = goBack
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun BackGestureScreen(
-    onBack: () -> Unit,
-    content: @Composable () -> Unit
-) {
-
-    var totalDrag by remember {
-        mutableStateOf(0f)
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-
-                detectHorizontalDragGestures(
-                    onDragStart = {
-                        totalDrag = 0f
-                    },
-                    onHorizontalDrag = { _, dragAmount ->
-
-                        totalDrag += dragAmount
-
-                        if (totalDrag < -150f) {
-                            onBack()
-                            totalDrag = 0f
-                        }
-                    },
-                    onDragEnd = {
-                        totalDrag = 0f
-                    },
-                    onDragCancel = {
-                        totalDrag = 0f
-                    }
                 )
             }
-    ) {
-        content()
+        }
     }
 }
 
@@ -239,39 +172,7 @@ fun Dashboard(
             modifier = Modifier.height(8.dp)
         )
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-
-            Column(
-                modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-
-                Text(
-                    text = "PIN DE HOJE",
-                    style = MaterialTheme.typography.labelLarge
-                )
-
-                Spacer(
-                    modifier = Modifier.height(4.dp)
-                )
-
-                Text(
-                    text = "483721",
-                    style = MaterialTheme.typography.headlineMedium
-                )
-
-                Spacer(
-                    modifier = Modifier.height(4.dp)
-                )
-
-                Text(
-                    text = "Válido até 23:59:59"
-                )
-            }
-        }
+        PinCard()
 
         Spacer(
             modifier = Modifier.height(8.dp)
@@ -304,79 +205,46 @@ fun Dashboard(
             modifier = Modifier.height(16.dp)
         )
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-
-            DashboardButton(
-                text = "SERVIDOR",
-                modifier = Modifier.weight(1f),
-                onClick = {
-                    onNavigate(GTStoreScreen.SERVIDOR)
-                }
-            )
-
-            DashboardButton(
-                text = "ARQUIVOS",
-                modifier = Modifier.weight(1f),
-                onClick = {
-                    onNavigate(GTStoreScreen.ARQUIVOS)
-                }
-            )
-        }
+        DashboardRow(
+            leftText = "SERVIDOR",
+            rightText = "ARQUIVOS",
+            leftAction = {
+                onNavigate(GTStoreScreen.SERVIDOR)
+            },
+            rightAction = {
+                onNavigate(GTStoreScreen.ARQUIVOS)
+            }
+        )
 
         Spacer(
             modifier = Modifier.height(8.dp)
         )
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-
-            DashboardButton(
-                text = "CLOUDFLARE",
-                modifier = Modifier.weight(1f),
-                onClick = {
-                    onNavigate(GTStoreScreen.CLOUDFLARE)
-                }
-            )
-
-            DashboardButton(
-                text = "GITHUB",
-                modifier = Modifier.weight(1f),
-                onClick = {
-                    onNavigate(GTStoreScreen.GITHUB)
-                }
-            )
-        }
+        DashboardRow(
+            leftText = "CLOUDFLARE",
+            rightText = "GITHUB",
+            leftAction = {
+                onNavigate(GTStoreScreen.CLOUDFLARE)
+            },
+            rightAction = {
+                onNavigate(GTStoreScreen.GITHUB)
+            }
+        )
 
         Spacer(
             modifier = Modifier.height(8.dp)
         )
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-
-            DashboardButton(
-                text = "DOWNLOADS",
-                modifier = Modifier.weight(1f),
-                onClick = {
-                    onNavigate(GTStoreScreen.DOWNLOADS)
-                }
-            )
-
-            DashboardButton(
-                text = "CONFIGURAÇÕES",
-                modifier = Modifier.weight(1f),
-                onClick = {
-                    onNavigate(GTStoreScreen.CONFIGURACOES)
-                }
-            )
-        }
+        DashboardRow(
+            leftText = "DOWNLOADS",
+            rightText = "CONFIGURAÇÕES",
+            leftAction = {
+                onNavigate(GTStoreScreen.DOWNLOADS)
+            },
+            rightAction = {
+                onNavigate(GTStoreScreen.CONFIGURACOES)
+            }
+        )
 
         Spacer(
             modifier = Modifier.height(12.dp)
@@ -402,6 +270,81 @@ fun Dashboard(
 }
 
 @Composable
+fun PinCard() {
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+
+            Text(
+                text = "PIN DE HOJE",
+                style = MaterialTheme.typography.labelLarge
+            )
+
+            Spacer(
+                modifier = Modifier.height(4.dp)
+            )
+
+            Text(
+                text = "483721",
+                style = MaterialTheme.typography.headlineMedium
+            )
+
+            Spacer(
+                modifier = Modifier.height(4.dp)
+            )
+
+            Text(
+                text = "Válido até 23:59:59"
+            )
+        }
+    }
+}
+
+@Composable
+fun DashboardRow(
+    leftText: String,
+    rightText: String,
+    leftAction: () -> Unit,
+    rightAction: () -> Unit
+) {
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+
+        Button(
+            onClick = leftAction,
+            modifier = Modifier
+                .weight(1f)
+                .height(50.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text(leftText)
+        }
+
+        Button(
+            onClick = rightAction,
+            modifier = Modifier
+                .weight(1f)
+                .height(50.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text(rightText)
+        }
+    }
+}
+
+@Composable
 fun FilesScreen(
     onBack: () -> Unit
 ) {
@@ -411,17 +354,21 @@ fun FilesScreen(
     }
 
     val packages = remember {
+
         listOf(
+
             PackageItem(
                 name = "PS4 Temperature",
                 size = "12 MB",
                 version = "1.0.0"
             ),
+
             PackageItem(
                 name = "Homebrew Store",
                 size = "25 MB",
                 version = "2.1.0"
             ),
+
             PackageItem(
                 name = "Payload Example",
                 size = "4 MB",
@@ -431,6 +378,7 @@ fun FilesScreen(
     }
 
     val filteredPackages = packages.filter { packageItem ->
+
         packageItem.name.contains(
             searchText,
             ignoreCase = true
@@ -610,25 +558,9 @@ fun StatusCard(
 }
 
 @Composable
-fun DashboardButton(
-    text: String,
-    modifier: Modifier,
-    onClick: () -> Unit
-) {
-
-    Button(
-        onClick = onClick,
-        modifier = modifier.height(50.dp),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-
-        Text(text)
-    }
-}
-
-@Composable
 fun SimpleScreen(
     title: String,
+    description: String,
     onBack: () -> Unit
 ) {
 
@@ -655,11 +587,11 @@ fun SimpleScreen(
         )
 
         Spacer(
-            modifier = Modifier.height(24.dp)
+            modifier = Modifier.height(16.dp)
         )
 
         Text(
-            text = "Esta tela será implementada na próxima etapa."
+            text = description
         )
 
         Spacer(
@@ -673,5 +605,3 @@ fun SimpleScreen(
         }
     }
 }
-
-
