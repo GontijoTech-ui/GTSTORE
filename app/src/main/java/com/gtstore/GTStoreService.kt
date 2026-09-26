@@ -50,10 +50,13 @@ class GTStoreService : Service() {
                 httpServer.stop()
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+
                     stopForeground(
                         STOP_FOREGROUND_REMOVE
                     )
+
                 } else {
+
                     @Suppress("DEPRECATION")
                     stopForeground(true)
                 }
@@ -88,6 +91,7 @@ class GTStoreService : Service() {
                 }
 
                 if (!httpServer.getStatus().running) {
+
                     httpServer.start()
                 }
             }
