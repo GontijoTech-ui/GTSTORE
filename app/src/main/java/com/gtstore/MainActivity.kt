@@ -1,6 +1,5 @@
 package com.gtstore
 
-import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -36,6 +35,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
 import com.gtstore.ui.theme.GTStoreTheme
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 enum class GTStoreScreen {
@@ -111,7 +112,8 @@ class MainActivity : ComponentActivity() {
                 )
 
         if (!savedUri.isNullOrBlank()) {
-            selectedFolderUri = Uri.parse(savedUri)
+            selectedFolderUri =
+                Uri.parse(savedUri)
         }
 
         setContent {
@@ -208,14 +210,16 @@ fun Dashboard(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement =
+            Arrangement.spacedBy(12.dp)
     ) {
 
         item {
 
             Text(
                 text = "GTSTORE",
-                style = MaterialTheme.typography.headlineMedium
+                style =
+                    MaterialTheme.typography.headlineMedium
             )
         }
 
@@ -223,7 +227,8 @@ fun Dashboard(
 
             Text(
                 text = "Painel principal",
-                style = MaterialTheme.typography.bodyLarge
+                style =
+                    MaterialTheme.typography.bodyLarge
             )
         }
 
@@ -392,6 +397,18 @@ fun FilesScreen(
         mutableIntStateOf(0)
     }
 
+    var lastAddedCount by remember {
+        mutableIntStateOf(0)
+    }
+
+    var lastRemovedCount by remember {
+        mutableIntStateOf(0)
+    }
+
+    var lastChangedCount by remember {
+        mutableIntStateOf(0)
+    }
+
     LaunchedEffect(
         selectedFolderUri,
         refreshCounter
@@ -402,18 +419,23 @@ fun FilesScreen(
             packages = emptyList()
             storageInfo = null
             lastScan = ""
+
+            lastAddedCount = 0
+            lastRemovedCount = 0
+            lastChangedCount = 0
+
             return@LaunchedEffect
         }
 
         scanning = true
 
-        packages = scanPackages(
-            selectedFolderUri
-        )
+        val scannedPackages =
+            scanPackages(
+                selectedFolderUri
+            )
 
-        PackageCatalog.save(
-            GTStoreApplication.context,
-            packages.map { pkg ->
+        val catalogPackages =
+            scannedPackages.map { pkg ->
 
                 CatalogPackage(
                     id = pkg.id,
@@ -425,7 +447,25 @@ fun FilesScreen(
                     version = pkg.version
                 )
             }
-        )
+
+        val syncResult =
+            PackageCatalog.synchronize(
+                context =
+                    GTStoreApplication.context,
+                currentPackages =
+                    catalogPackages
+            )
+
+        packages = scannedPackages
+
+        lastAddedCount =
+            syncResult.added.size
+
+        lastRemovedCount =
+            syncResult.removed.size
+
+        lastChangedCount =
+            syncResult.changed.size
 
         storageInfo =
             getStorageInfo(
@@ -433,11 +473,11 @@ fun FilesScreen(
             )
 
         lastScan =
-            java.text.SimpleDateFormat(
+            SimpleDateFormat(
                 "dd/MM/yyyy HH:mm:ss",
                 Locale.getDefault()
             ).format(
-                java.util.Date()
+                Date()
             )
 
         scanning = false
@@ -456,14 +496,16 @@ fun FilesScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement =
+            Arrangement.spacedBy(12.dp)
     ) {
 
         item {
 
             Text(
                 text = "ARQUIVOS",
-                style = MaterialTheme.typography.headlineMedium
+                style =
+                    MaterialTheme.typography.headlineMedium
             )
         }
 
@@ -481,13 +523,15 @@ fun FilesScreen(
 
                     Text(
                         text = "ARMAZENAMENTO",
-                        style = MaterialTheme.typography.titleLarge
+                        style =
+                            MaterialTheme.typography.titleLarge
                     )
 
                     if (selectedFolderUri == null) {
 
                         Text(
-                            text = "Nenhuma pasta selecionada."
+                            text =
+                                "Nenhuma pasta selecionada."
                         )
 
                     } else {
@@ -538,14 +582,63 @@ fun FilesScreen(
                                     "Última verificação: $lastScan"
                             )
                         }
+
+                        if (
+                            lastAddedCount > 0 ||
+                            lastRemovedCount > 0 ||
+                            lastChangedCount > 0
+                        ) {
+
+                            Spacer(
+                                modifier =
+                                    Modifier.height(4.dp)
+                            )
+
+                            Text(
+                                text =
+                                    "Alterações nesta verificação:"
+                            )
+
+                            if (
+                                lastAddedCount > 0
+                            ) {
+
+                                Text(
+                                    text =
+                                        "Adicionados: $lastAddedCount"
+                                )
+                            }
+
+                            if (
+                                lastRemovedCount > 0
+                            ) {
+
+                                Text(
+                                    text =
+                                        "Removidos: $lastRemovedCount"
+                                )
+                            }
+
+                            if (
+                                lastChangedCount > 0
+                            ) {
+
+                                Text(
+                                    text =
+                                        "Alterados: $lastChangedCount"
+                                )
+                            }
+                        }
                     }
 
                     Spacer(
-                        modifier = Modifier.height(8.dp)
+                        modifier =
+                            Modifier.height(8.dp)
                     )
 
                     Row(
-                        modifier = Modifier.fillMaxWidth()
+                        modifier =
+                            Modifier.fillMaxWidth()
                     ) {
 
                         Button(
@@ -556,6 +649,7 @@ fun FilesScreen(
                                 selectedFolderUri != null &&
                                     !scanning
                         ) {
+
                             Text(
                                 if (scanning)
                                     "VERIFICANDO..."
@@ -565,25 +659,35 @@ fun FilesScreen(
                         }
 
                         Spacer(
-                            modifier = Modifier.width(8.dp)
+                            modifier =
+                                Modifier.width(8.dp)
                         )
 
                         Button(
-                            onClick = onSelectFolder
+                            onClick =
+                                onSelectFolder
                         ) {
-                            Text("ALTERAR PASTA")
+
+                            Text(
+                                "ALTERAR PASTA"
+                            )
                         }
                     }
 
                     Spacer(
-                        modifier = Modifier.height(4.dp)
+                        modifier =
+                            Modifier.height(4.dp)
                     )
 
                     Button(
                         onClick = onBack,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier =
+                            Modifier.fillMaxWidth()
                     ) {
-                        Text("VOLTAR")
+
+                        Text(
+                            "VOLTAR"
+                        )
                     }
                 }
             }
@@ -598,9 +702,12 @@ fun FilesScreen(
                     onValueChange = {
                         searchText = it
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier =
+                        Modifier.fillMaxWidth(),
                     label = {
-                        Text("Pesquisar PKG")
+                        Text(
+                            "Pesquisar PKG"
+                        )
                     },
                     singleLine = true
                 )
@@ -616,7 +723,8 @@ fun FilesScreen(
             item {
 
                 Card(
-                    modifier = Modifier.fillMaxWidth()
+                    modifier =
+                        Modifier.fillMaxWidth()
                 ) {
 
                     Text(
@@ -759,10 +867,6 @@ fun getStorageInfo(
 
     return try {
 
-        val documentId =
-            android.provider.DocumentsContract
-                .getTreeDocumentId(folderUri)
-
         val volumeName =
             android.provider.DocumentsContract
                 .getTreeDocumentId(folderUri)
@@ -792,10 +896,12 @@ fun getStorageInfo(
             statFs.blockSizeLong
 
         val total =
-            statFs.blockCountLong * blockSize
+            statFs.blockCountLong *
+                blockSize
 
         val free =
-            statFs.availableBlocksLong * blockSize
+            statFs.availableBlocksLong *
+                blockSize
 
         val used =
             total - free
@@ -824,6 +930,7 @@ fun formatFileSize(
         bytes / 1024.0
 
     if (kb < 1024) {
+
         return String.format(
             Locale.getDefault(),
             "%.2f KB",
@@ -835,6 +942,7 @@ fun formatFileSize(
         kb / 1024.0
 
     if (mb < 1024) {
+
         return String.format(
             Locale.getDefault(),
             "%.2f MB",
@@ -846,6 +954,7 @@ fun formatFileSize(
         mb / 1024.0
 
     if (gb < 1024) {
+
         return String.format(
             Locale.getDefault(),
             "%.2f GB",
@@ -869,11 +978,13 @@ fun PackageCard(
 ) {
 
     Card(
-        modifier = Modifier.fillMaxWidth()
+        modifier =
+            Modifier.fillMaxWidth()
     ) {
 
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier =
+                Modifier.padding(16.dp),
             verticalArrangement =
                 Arrangement.spacedBy(4.dp)
         ) {
@@ -885,13 +996,17 @@ fun PackageCard(
             )
 
             Text(
-                text = "Tamanho: ${pkg.size}"
+                text =
+                    "Tamanho: ${pkg.size}"
             )
 
-            if (pkg.version.isNotBlank()) {
+            if (
+                pkg.version.isNotBlank()
+            ) {
 
                 Text(
-                    text = "Versão: ${pkg.version}"
+                    text =
+                        "Versão: ${pkg.version}"
                 )
             }
 
@@ -909,13 +1024,15 @@ fun StatusCard(
 ) {
 
     Card(
-        modifier = Modifier.fillMaxWidth()
+        modifier =
+            Modifier.fillMaxWidth()
     ) {
 
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
             horizontalArrangement =
                 Arrangement.SpaceBetween
         ) {
@@ -940,9 +1057,10 @@ fun SimpleScreen(
 ) {
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(16.dp),
         verticalArrangement =
             Arrangement.spacedBy(16.dp)
     ) {
@@ -954,14 +1072,19 @@ fun SimpleScreen(
         )
 
         Text(
-            text = "Módulo em desenvolvimento."
+            text =
+                "Módulo em desenvolvimento."
         )
 
         Button(
             onClick = onBack,
-            modifier = Modifier.fillMaxWidth()
+            modifier =
+                Modifier.fillMaxWidth()
         ) {
-            Text("VOLTAR")
+
+            Text(
+                "VOLTAR"
+            )
         }
     }
 }
