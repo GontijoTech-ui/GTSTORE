@@ -14,13 +14,13 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Configurar Java JDK 17
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         java-version: '17'
         distribution: 'temurin'
 
     - name: Configurar Android SDK
-      uses: android-actions/setup-android@v3
+      uses: android-actions/setup-android@v4
 
     - name: Baixar binário Cloudflared (ARM64)
       run: |
