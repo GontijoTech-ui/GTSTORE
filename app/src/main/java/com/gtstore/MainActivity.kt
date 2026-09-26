@@ -69,9 +69,20 @@ data class StorageInfo(
     val free: Long
 )
 
-private val gtStoreHttpServer = HttpServer(8080)
-
 class MainActivity : ComponentActivity() {
+
+    /*
+     * O servidor agora pertence à Activity.
+     *
+     * O HttpServer precisa do Context para verificar
+     * se a rede ativa é realmente Wi-Fi.
+     */
+    private val gtStoreHttpServer by lazy {
+        HttpServer(
+            applicationContext,
+            8080
+        )
+    }
 
     private var selectedFolderUri by mutableStateOf<Uri?>(null)
 
@@ -125,7 +136,8 @@ class MainActivity : ComponentActivity() {
                     selectedFolderUri = selectedFolderUri,
                     onSelectFolder = {
                         folderPicker.launch(null)
-                    }
+                    },
+                    httpServer = gtStoreHttpServer
                 )
             }
         }
@@ -140,7 +152,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun GTStoreApp(
     selectedFolderUri: Uri?,
-    onSelectFolder: () -> Unit
+    onSelectFolder: () -> Unit,
+    httpServer: HttpServer
 ) {
 
     var currentScreen by remember {
@@ -154,6 +167,7 @@ fun GTStoreApp(
         GTStoreScreen.DASHBOARD -> {
 
             Dashboard(
+                httpServer = httpServer,
                 onNavigate = {
                     currentScreen = it
                 }
@@ -163,6 +177,7 @@ fun GTStoreApp(
         GTStoreScreen.SERVIDOR -> {
 
             ServerScreen(
+                httpServer = httpServer,
                 onBack = {
                     currentScreen =
                         GTStoreScreen.DASHBOARD
@@ -217,12 +232,13 @@ fun GTStoreApp(
 
 @Composable
 fun Dashboard(
+    httpServer: HttpServer,
     onNavigate: (GTStoreScreen) -> Unit
 ) {
 
     var serverRunning by remember {
         mutableStateOf(
-            gtStoreHttpServer.isRunning()
+            httpServer.isRunning()
         )
     }
 
@@ -231,7 +247,7 @@ fun Dashboard(
         while (true) {
 
             serverRunning =
-                gtStoreHttpServer.isRunning()
+                httpServer.isRunning()
 
             delay(1000)
         }
@@ -409,12 +425,13 @@ fun Dashboard(
 
 @Composable
 fun ServerScreen(
+    httpServer: HttpServer,
     onBack: () -> Unit
 ) {
 
     var status by remember {
         mutableStateOf(
-            gtStoreHttpServer.getStatus()
+            httpServer.getStatus()
         )
     }
 
@@ -427,7 +444,7 @@ fun ServerScreen(
         while (true) {
 
             status =
-                gtStoreHttpServer.getStatus()
+                httpServer.getStatus()
 
             delay(1000)
         }
@@ -507,10 +524,10 @@ fun ServerScreen(
                         onClick = {
 
                             if (
-                                gtStoreHttpServer.isRunning()
+                                httpServer.isRunning()
                             ) {
 
-                                gtStoreHttpServer.stop()
+                                httpServer.stop()
 
                                 message =
                                     "Servidor parado."
@@ -518,15 +535,18 @@ fun ServerScreen(
                             } else {
 
                                 val started =
-                                    gtStoreHttpServer.start()
+                                    httpServer.start()
 
                                 message =
                                     if (started) {
                                         "Servidor iniciado."
                                     } else {
-                                        "Não foi possível iniciar o servidor. A porta pode estar ocupada."
+                                        "Não foi possível iniciar. Verifique se o Wi-Fi está conectado e se a porta 8080 está disponível."
                                     }
                             }
+
+                            status =
+                                httpServer.getStatus()
                         },
                         modifier =
                             Modifier.fillMaxWidth()
@@ -550,7 +570,7 @@ fun ServerScreen(
                     Button(
                         onClick = {
                             status =
-                                gtStoreHttpServer.getStatus()
+                                httpServer.getStatus()
                         },
                         modifier =
                             Modifier.fillMaxWidth()
