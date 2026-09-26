@@ -7,7 +7,6 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStream
 import java.net.Inet4Address
-import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.nio.charset.StandardCharsets
@@ -48,12 +47,12 @@ class HttpServer(
         return try {
 
             /*
-             * O servidor é vinculado EXCLUSIVAMENTE ao
-             * endereço IPv4 da interface Wi-Fi.
+             * O servidor fica vinculado exclusivamente
+             * ao endereço IPv4 da rede Wi-Fi.
              *
              * Não usamos 0.0.0.0 porque isso faria o
-             * servidor escutar também em outras interfaces,
-             * como dados móveis.
+             * servidor escutar em todas as interfaces,
+             * inclusive dados móveis.
              */
             val socket = ServerSocket(
                 port,
@@ -174,8 +173,6 @@ class HttpServer(
                     ?: return null
 
             /*
-             * REGRA PRINCIPAL:
-             *
              * O servidor só funciona quando a rede ativa
              * possui transporte Wi-Fi.
              */
@@ -477,3 +474,6 @@ class HttpServer(
         }
     }
 }
+
+
+
