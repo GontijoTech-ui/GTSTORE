@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
 import com.gtstore.ui.theme.GTStoreTheme
+import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -112,6 +113,7 @@ class MainActivity : ComponentActivity() {
                 )
 
         if (!savedUri.isNullOrBlank()) {
+
             selectedFolderUri =
                 Uri.parse(savedUri)
         }
@@ -272,7 +274,8 @@ fun Dashboard(
                         GTStoreScreen.SERVIDOR
                     )
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier =
+                    Modifier.fillMaxWidth()
             ) {
                 Text("SERVIDOR")
             }
@@ -286,7 +289,8 @@ fun Dashboard(
                         GTStoreScreen.ARQUIVOS
                     )
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier =
+                    Modifier.fillMaxWidth()
             ) {
                 Text("ARQUIVOS")
             }
@@ -300,7 +304,8 @@ fun Dashboard(
                         GTStoreScreen.CLOUDFLARE
                     )
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier =
+                    Modifier.fillMaxWidth()
             ) {
                 Text("CLOUDFLARE")
             }
@@ -314,7 +319,8 @@ fun Dashboard(
                         GTStoreScreen.GITHUB
                     )
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier =
+                    Modifier.fillMaxWidth()
             ) {
                 Text("GITHUB")
             }
@@ -328,7 +334,8 @@ fun Dashboard(
                         GTStoreScreen.DOWNLOADS
                     )
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier =
+                    Modifier.fillMaxWidth()
             ) {
                 Text("DOWNLOADS")
             }
@@ -342,7 +349,8 @@ fun Dashboard(
                         GTStoreScreen.CONFIGURACOES
                     )
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier =
+                    Modifier.fillMaxWidth()
             ) {
                 Text("CONFIGURAÇÕES")
             }
@@ -356,7 +364,8 @@ fun Dashboard(
                         GTStoreScreen.LOGS
                     )
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier =
+                    Modifier.fillMaxWidth()
             ) {
                 Text("LOGS")
             }
@@ -493,9 +502,10 @@ fun FilesScreen(
         }
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(16.dp),
         verticalArrangement =
             Arrangement.spacedBy(12.dp)
     ) {
@@ -512,11 +522,13 @@ fun FilesScreen(
         item {
 
             Card(
-                modifier = Modifier.fillMaxWidth()
+                modifier =
+                    Modifier.fillMaxWidth()
             ) {
 
                 Column(
-                    modifier = Modifier.padding(16.dp),
+                    modifier =
+                        Modifier.padding(16.dp),
                     verticalArrangement =
                         Arrangement.spacedBy(6.dp)
                 ) {
@@ -537,7 +549,8 @@ fun FilesScreen(
                     } else {
 
                         Text(
-                            text = "HD: CONECTADO"
+                            text =
+                                "HD: CONECTADO"
                         )
 
                         storageInfo?.let { info ->
@@ -823,9 +836,8 @@ fun scanDocumentTree(
 
             val id =
                 buildPackageId(
-                    name = fileName,
-                    size = size,
-                    modified = modified
+                    path =
+                        file.uri.toString()
                 )
 
             result.add(
@@ -833,9 +845,11 @@ fun scanDocumentTree(
                     id = id,
                     name = fileName,
                     file = fileName,
-                    path = file.uri.toString(),
+                    path =
+                        file.uri.toString(),
                     sizeBytes = size,
-                    size = formatFileSize(size),
+                    size =
+                        formatFileSize(size),
                     modified = modified,
                     version = ""
                 )
@@ -845,20 +859,32 @@ fun scanDocumentTree(
 }
 
 fun buildPackageId(
-    name: String,
-    size: Long,
-    modified: Long
+    path: String
 ): String {
 
-    return "$name-$size-$modified"
-        .lowercase(
-            Locale.getDefault()
-        )
-        .replace(
-            Regex("[^a-z0-9]+"),
-            "-"
-        )
-        .trim('-')
+    return try {
+
+        val digest =
+            MessageDigest.getInstance(
+                "SHA-256"
+            )
+
+        val hash =
+            digest.digest(
+                path.toByteArray(
+                    Charsets.UTF_8
+                )
+            )
+
+        hash.joinToString("") {
+            "%02x".format(it)
+        }
+
+    } catch (_: Exception) {
+
+        path.hashCode()
+            .toString()
+    }
 }
 
 fun getStorageInfo(
@@ -923,6 +949,7 @@ fun formatFileSize(
 ): String {
 
     if (bytes < 1024) {
+
         return "$bytes B"
     }
 
@@ -1011,7 +1038,8 @@ fun PackageCard(
             }
 
             Text(
-                text = "Tipo: PKG"
+                text =
+                    "Tipo: PKG"
             )
         }
     }
@@ -1088,6 +1116,3 @@ fun SimpleScreen(
         }
     }
 }
-
-
-
