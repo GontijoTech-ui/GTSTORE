@@ -76,7 +76,7 @@ class HttpServer(
                     } catch (_: Exception) {
 
                         if (running.get()) {
-                            // Falha durante accept.
+                            // Erro durante accept.
                         }
                     }
                 }
@@ -236,7 +236,7 @@ class HttpServer(
 
         } catch (_: Exception) {
 
-            // Cliente encerrou a conexão ou ocorreu erro de rede.
+            // Cliente encerrou a conexão.
 
         } finally {
 
@@ -291,7 +291,6 @@ class HttpServer(
         )
 
         if (bodyBytes.isNotEmpty()) {
-
             output.write(bodyBytes)
         }
 
@@ -306,9 +305,13 @@ class HttpServer(
         return """
             <!DOCTYPE html>
             <html lang="pt-BR">
+
             <head>
                 <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <meta
+                    name="viewport"
+                    content="width=device-width, initial-scale=1.0"
+                >
                 <title>GTSTORE</title>
             </head>
 
@@ -316,7 +319,9 @@ class HttpServer(
 
                 <h1>GTSTORE</h1>
 
-                <p>Servidor HTTP funcionando.</p>
+                <p>
+                    Servidor HTTP funcionando.
+                </p>
 
                 <p>
                     Endereço:
@@ -330,6 +335,7 @@ class HttpServer(
                 </p>
 
             </body>
+
             </html>
         """.trimIndent()
     }
@@ -356,6 +362,49 @@ class HttpServer(
                     NetworkInterface.getNetworkInterfaces()
                 )
 
+            /*
+             * Primeiro procuramos uma interface que tenha
+             * endereço IPv4 privado típico de uma rede local.
+             *
+             * Exemplos:
+             * 192.168.x.x
+             * 10.x.x.x
+             * 172.16.x.x até 172.31.x.x
+             */
+
+            for (networkInterface in interfaces) {
+
+                if (
+                    !networkInterface.isUp ||
+                    networkInterface.isLoopback
+                ) {
+                    continue
+                }
+
+                val addresses =
+                    Collections.list(
+                        networkInterface.inetAddresses
+                    )
+
+                for (address in addresses) {
+
+                    if (
+                        address is Inet4Address &&
+                        !address.isLoopbackAddress &&
+                        isPrivateIpv4(address)
+                    ) {
+
+                        return address.hostAddress
+                            ?: continue
+                    }
+                }
+            }
+
+            /*
+             * Fallback caso a interface Wi-Fi não seja
+             * identificada como endereço privado.
+             */
+
             for (networkInterface in interfaces) {
 
                 if (
@@ -378,7 +427,7 @@ class HttpServer(
                     ) {
 
                         return address.hostAddress
-                            ?: "0.0.0.0"
+                            ?: continue
                     }
                 }
             }
@@ -388,6 +437,41 @@ class HttpServer(
         } catch (_: SocketException) {
 
             "127.0.0.1"
+        }
+    }
+
+    private fun isPrivateIpv4(
+        address: Inet4Address
+    ): Boolean {
+
+        val bytes =
+            address.address
+
+        val first =
+            bytes[0].toInt() and 0xFF
+
+        val second =
+            bytes[1].toInt() and 0xFF
+
+        return when {
+
+            first == 10 -> {
+                true
+            }
+
+            first == 172 &&
+                second in 16..31 -> {
+                true
+            }
+
+            first == 192 &&
+                second == 168 -> {
+                true
+            }
+
+            else -> {
+                false
+            }
         }
     }
 }
