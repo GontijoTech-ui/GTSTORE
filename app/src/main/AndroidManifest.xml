@@ -4,13 +4,13 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- Permite manter o servidor ativo em primeiro plano -->
+    <!-- Foreground Service -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
-    <!-- Necessário para Foreground Service relacionado a dados/conectividade -->
+    <!-- Foreground Service para sincronização/transferência de dados -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
-    <!-- Permite exibir a notificação do serviço no Android 13+ -->
+    <!-- Notificação do serviço no Android 13+ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
@@ -29,6 +29,12 @@
             </intent-filter>
 
         </activity>
+
+        <!-- Serviço responsável pelo servidor GTSTORE em segundo plano -->
+        <service
+            android:name=".GTStoreService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
     </application>
 
