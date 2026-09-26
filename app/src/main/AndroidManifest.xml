@@ -4,6 +4,15 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- Permite manter o servidor ativo em primeiro plano -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <!-- Necessário para Foreground Service relacionado a dados/conectividade -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <!-- Permite exibir a notificação do serviço no Android 13+ -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:name=".GTStoreApplication"
         android:allowBackup="false"
@@ -24,6 +33,3 @@
     </application>
 
 </manifest>
-
-
-
