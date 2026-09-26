@@ -962,57 +962,51 @@ class HttpServer(
     }
 
     private fun sendResponse(
-        output: OutputStream,
-        status: String,
-        contentType: String,
-        body: String
-    ) {
+    output: OutputStream,
+    status: String,
+    contentType: String,
+    body: String
+) {
 
-        val bodyBytes =
-            body.toByteArray(
-                StandardCharsets.UTF_8
-            )
-
-        val headers =
-            buildString {
-
-                append("HTTP/1.1 ")
-                append(status)
-                append("\r\n")
-
-                append("Content-Type: ")
-                append(contentType)
-                append("\r\n")
-
-                append("Content-Length: ")
-                append(bodyBytes.size)
-                append("\r\n")
-
-                append("Connection: close\r\n")
-
-                append("Cache-Control: no-store\r\n")
-
-                append(
-                    "Access-Control-Allow-Origin: *\r\n"
-                )
-
-                append("\r\n")
-            }
-
-        output.write(
-            headers.toByteArray(
-                StandardCharsets.UTF_8
-            )
+    val bodyBytes =
+        body.toByteArray(
+            StandardCharsets.UTF_8
         )
 
-        if (bodyBytes.isNotEmpty()) {
+    val headers =
+        buildString {
 
-            output.write(
-                bodyBytes
-            )
+            append("HTTP/1.0 ")
+            append(status)
+            append("\r\n")
+
+            append("Content-Type: ")
+            append(contentType)
+            append("\r\n")
+
+            append("Content-Length: ")
+            append(bodyBytes.size)
+            append("\r\n")
+
+            append("Connection: close\r\n")
+
+            append("\r\n")
         }
 
-        output.flush()
+    output.write(
+        headers.toByteArray(
+            StandardCharsets.US_ASCII
+        )
+    )
+
+    if (bodyBytes.isNotEmpty()) {
+
+        output.write(
+            bodyBytes
+        )
+    }
+
+    output.flush()
     }
 
     private fun buildPackageId(
