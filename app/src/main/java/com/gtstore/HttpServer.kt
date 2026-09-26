@@ -553,38 +553,18 @@ class HttpServer(
     private fun buildPs4TestPage(): String {
 
     return """
-        <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
-        "http://www.w3.org/TR/html4/strict.dtd">
-
         <html>
         <head>
-            <title>GTSTORE</title>
+        <title>GTSTORE</title>
         </head>
-
         <body>
-
-            <h1>GTSTORE</h1>
-
-            <p>Servidor funcionando.</p>
-
-            <p>TESTE PS4</p>
-
-            <p>
-                <a href="/api/status">
-                    TESTAR STATUS
-                </a>
-            </p>
-
-            <p>
-                <a href="/">
-                    VOLTAR
-                </a>
-            </p>
-
+        <h1>GTSTORE</h1>
+        <p>TESTE PS4 OK</p>
+        <p><a href="/api/status">STATUS</a></p>
         </body>
         </html>
     """.trimIndent()
-    }
+}
 
     private fun buildPackagesJson(): String {
 
