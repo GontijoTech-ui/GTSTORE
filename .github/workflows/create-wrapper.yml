@@ -31,16 +31,14 @@ jobs:
           ls -la gradlew.bat
           ls -la gradle/wrapper/
 
-      - name: Salvar Wrapper no repositório
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add gradlew gradlew.bat gradle/wrapper
-
-          git commit -m "Adicionar Gradle Wrapper" || echo "Wrapper já está atualizado"
-
-          git push
-
+      - name: Disponibilizar Gradle Wrapper
+        uses: actions/upload-artifact@v4
+        with:
+          name: GTSTORE-Gradle-Wrapper
+          path: |
+            gradlew
+            gradlew.bat
+            gradle/wrapper/gradle-wrapper.jar
+            gradle/wrapper/gradle-wrapper.properties
 
 
