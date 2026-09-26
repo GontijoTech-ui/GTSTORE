@@ -1,10 +1,15 @@
 package com.gtstore
 
 import android.content.Context
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
+import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import androidx.documentfile.provider.DocumentFile
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.BufferedInputStream
 import java.io.BufferedReader
+import java.io.InputStream
 import java.io.InputStreamReader
 import java.io.OutputStream
 import java.net.Inet4Address
@@ -12,15 +17,8 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
-
-data class ServerStatus(
-    val running: Boolean,
-    val port: Int,
-    val localAddress: String,
-    val activeConnections: Int
-)
+import java.util.Locale
+import java.util.concurrent.Executors
 
 class HttpServer(
     private val context: Context,
@@ -28,99 +26,78 @@ class HttpServer(
 ) {
 
     private var serverSocket: ServerSocket? = null
-    private var serverThread: Thread? = null
+    private var running = false
 
-    private val running = AtomicBoolean(false)
+    private val executor = Executors.newCachedThreadPool()
 
-    private val activeConnections = AtomicInteger(0)
+    private val mainHandler = Handler(Looper.getMainLooper())
 
-    fun start(): Boolean {
+    data class ServerStatus(
+        val online: Boolean,
+        val port: Int,
+        val address: String,
+        val url: String,
+        val activeConnections: Int
+    )
 
-        if (running.get()) {
-            return true
-        }
+    private data class PkgInfo(
+        val id: Int,
+        val name: String,
+        val fileName: String,
+        val uri: Uri,
+        val size: Long,
+        val modified: Long
+    )
 
-        val wifiAddress =
-            getWifiIpv4Address()
+    @Volatile
+    private var activeConnections = 0
 
-        if (wifiAddress == null) {
-            return false
-        }
+    // ---------------------------------------------------------
+    // START
+    // ---------------------------------------------------------
 
-        return try {
+    fun start() {
+        if (running) return
 
-            /*
-             * O servidor fica vinculado exclusivamente
-             * ao endereço IPv4 da rede Wi-Fi.
-             */
-            val socket =
-                ServerSocket(
-                    port,
-                    50,
-                    wifiAddress
-                )
+        executor.execute {
+            try {
+                val address = getWifiIpv4Address()
 
-            socket.reuseAddress = true
-
-            serverSocket = socket
-
-            running.set(true)
-
-            serverThread =
-                Thread {
-
-                    while (running.get()) {
-
-                        try {
-
-                            val client =
-                                socket.accept()
-
-                            activeConnections.incrementAndGet()
-
-                            Thread {
-
-                                handleClient(client)
-
-                            }.apply {
-
-                                name =
-                                    "GTSTORE-HTTP-CLIENT"
-
-                                start()
-                            }
-
-                        } catch (_: Exception) {
-
-                            if (running.get()) {
-                                // Erro durante accept.
-                            }
-                        }
-                    }
-
-                }.apply {
-
-                    name =
-                        "GTSTORE-HTTP-SERVER"
-
-                    start()
+                if (address == null) {
+                    running = false
+                    return@execute
                 }
 
-            true
+                serverSocket = ServerSocket(port, 50, address)
+                running = true
 
-        } catch (_: Exception) {
+                while (running) {
+                    try {
+                        val client = serverSocket?.accept() ?: break
 
-            running.set(false)
+                        executor.execute {
+                            handleClient(client)
+                        }
 
-            serverSocket = null
+                    } catch (_: Exception) {
+                        if (running) {
+                            // continua tentando aceitar conexões
+                        }
+                    }
+                }
 
-            false
+            } catch (_: Exception) {
+                running = false
+            }
         }
     }
 
-    fun stop() {
+    // ---------------------------------------------------------
+    // STOP
+    // ---------------------------------------------------------
 
-        running.set(false)
+    fun stop() {
+        running = false
 
         try {
             serverSocket?.close()
@@ -128,527 +105,771 @@ class HttpServer(
         }
 
         serverSocket = null
-
-        try {
-            serverThread?.interrupt()
-        } catch (_: Exception) {
-        }
-
-        serverThread = null
-
-        activeConnections.set(0)
     }
 
+    // ---------------------------------------------------------
+    // STATUS
+    // ---------------------------------------------------------
+
     fun isRunning(): Boolean {
-        return running.get()
+        return running
     }
 
     fun getStatus(): ServerStatus {
+        val address = getWifiIpv4Address()?.hostAddress ?: "0.0.0.0"
 
         return ServerStatus(
-            running = running.get(),
+            online = running,
             port = port,
-            localAddress =
-                getWifiIpv4Address()
-                    ?.hostAddress
-                    ?: "SEM WI-FI",
-            activeConnections =
-                activeConnections.get()
+            address = address,
+            url = "http://$address:$port",
+            activeConnections = activeConnections
         )
     }
 
-    private fun getWifiIpv4Address(): Inet4Address? {
+    // ---------------------------------------------------------
+    // CLIENT
+    // ---------------------------------------------------------
 
-        return try {
+    private fun handleClient(socket: Socket) {
 
-            val connectivityManager =
-                context.getSystemService(
-                    Context.CONNECTIVITY_SERVICE
-                ) as ConnectivityManager
+        activeConnections++
 
-            val network =
-                connectivityManager.activeNetwork
-                    ?: return null
+        socket.use { client ->
 
-            val capabilities =
-                connectivityManager.getNetworkCapabilities(
-                    network
-                )
-                    ?: return null
+            client.soTimeout = 30_000
 
-            if (
-                !capabilities.hasTransport(
-                    NetworkCapabilities.TRANSPORT_WIFI
-                )
-            ) {
-                return null
-            }
+            try {
 
-            val linkProperties =
-                connectivityManager.getLinkProperties(
-                    network
-                )
-                    ?: return null
-
-            for (
-                linkAddress
-                in linkProperties.linkAddresses
-            ) {
-
-                val address =
-                    linkAddress.address
-
-                if (
-                    address is Inet4Address &&
-                    !address.isLoopbackAddress &&
-                    isPrivateIpv4(address)
-                ) {
-
-                    return address
-                }
-            }
-
-            null
-
-        } catch (_: Exception) {
-
-            null
-        }
-    }
-
-    private fun handleClient(
-        socket: Socket
-    ) {
-
-        try {
-
-            socket.use {
-
-                socket.soTimeout = 15000
-
-                val reader =
-                    BufferedReader(
-                        InputStreamReader(
-                            socket.getInputStream(),
-                            StandardCharsets.UTF_8
-                        )
+                val input = BufferedReader(
+                    InputStreamReader(
+                        client.getInputStream(),
+                        StandardCharsets.ISO_8859_1
                     )
+                )
 
-                val requestLine =
-                    reader.readLine()
-                        ?: return@use
+                val output = client.getOutputStream()
+
+                val requestLine = input.readLine() ?: return
+
+                val parts = requestLine.split(" ")
+
+                if (parts.size < 2) {
+                    sendError(
+                        output,
+                        400,
+                        "Bad Request"
+                    )
+                    return
+                }
+
+                val method = parts[0].uppercase(Locale.US)
+                val target = parts[1]
+
+                val headers = mutableMapOf<String, String>()
 
                 while (true) {
 
-                    val line =
-                        reader.readLine()
-                            ?: break
+                    val line = input.readLine() ?: break
 
                     if (line.isEmpty()) {
                         break
                     }
+
+                    val separator = line.indexOf(":")
+
+                    if (separator > 0) {
+
+                        val key = line
+                            .substring(0, separator)
+                            .trim()
+                            .lowercase(Locale.US)
+
+                        val value = line
+                            .substring(separator + 1)
+                            .trim()
+
+                        headers[key] = value
+                    }
                 }
 
-                val parts =
-                    requestLine.split(" ")
+                when (method) {
 
-                val method =
-                    parts.getOrNull(0)
-                        ?: ""
+                    "GET" -> handleGet(
+                        target,
+                        headers,
+                        output
+                    )
 
-                val rawTarget =
-                    parts.getOrNull(1)
-                        ?: "/"
-
-                val path =
-                    rawTarget
-                        .substringBefore("?")
-
-                val query =
-                    rawTarget
-                        .substringAfter(
-                            "?",
-                            ""
-                        )
-
-                when {
-
-                    method != "GET" -> {
-
-                        sendResponse(
-                            socket.outputStream,
-                            "405 Method Not Allowed",
-                            "text/plain; charset=utf-8",
-                            "Método não permitido."
-                        )
-                    }
-
-                    path == "/" -> {
-
-                        sendResponse(
-                            socket.outputStream,
-                            "200 OK",
-                            "text/html; charset=utf-8",
-                            buildHomePage()
-                        )
-                    }
-
-                    path == "/ps4" -> {
-
-                        sendResponse(
-                            socket.outputStream,
-                            "200 OK",
-                            "text/html; charset=utf-8",
-                            buildPs4TestPage()
-                        )
-                    }
-
-                    path == "/api/status" -> {
-
-                        sendResponse(
-                            socket.outputStream,
-                            "200 OK",
-                            "application/json; charset=utf-8",
-                            buildStatusJson()
-                        )
-                    }
-
-                    path == "/api/packages" -> {
-
-                        sendResponse(
-                            socket.outputStream,
-                            "200 OK",
-                            "application/json; charset=utf-8",
-                            buildPackagesJson()
-                        )
-                    }
-
-                    path == "/download" -> {
-
-                        handleDownload(
-                            socket = socket,
-                            query = query
-                        )
-                    }
-
-                    path == "/favicon.ico" -> {
-
-                        sendResponse(
-                            socket.outputStream,
-                            "204 No Content",
-                            "text/plain; charset=utf-8",
-                            ""
-                        )
-                    }
+                    "HEAD" -> handleHead(
+                        target,
+                        headers,
+                        output
+                    )
 
                     else -> {
 
                         sendResponse(
-                            socket.outputStream,
-                            "404 Not Found",
-                            "text/plain; charset=utf-8",
-                            "GTSTORE: página não encontrada."
+                            output = output,
+                            status = 405,
+                            statusText = "Method Not Allowed",
+                            headers = mapOf(
+                                "Allow" to "GET, HEAD",
+                                "Content-Length" to "0",
+                                "Connection" to "close"
+                            )
                         )
                     }
                 }
+
+            } catch (_: Exception) {
+                // Cliente fechou a conexão ou houve erro de rede.
+            }
+        }
+
+        activeConnections--
+    }
+
+    // ---------------------------------------------------------
+    // GET
+    // ---------------------------------------------------------
+
+    private fun handleGet(
+        target: String,
+        headers: Map<String, String>,
+        output: OutputStream
+    ) {
+
+        val uri = Uri.parse(target)
+
+        when (uri.path ?: "/") {
+
+            "/" -> {
+                sendHomePage(output)
             }
 
-        } catch (_: Exception) {
+            "/ps4" -> {
+                sendPs4Page(output)
+            }
 
-            // Cliente encerrou a conexão.
+            "/api/status" -> {
+                sendStatusJson(output)
+            }
+
+            "/api/packages" -> {
+                sendPackagesJson(output)
+            }
+
+            "/download" -> {
+                val id = uri.getQueryParameter("id")?.toIntOrNull()
+
+                if (id == null) {
+                    sendError(
+                        output,
+                        400,
+                        "Missing package id"
+                    )
+                    return
+                }
+
+                val pkg = getPackages()
+                    .firstOrNull { it.id == id }
+
+                if (pkg == null) {
+                    sendError(
+                        output,
+                        404,
+                        "Package not found"
+                    )
+                    return
+                }
+
+                servePackage(
+                    pkg = pkg,
+                    rangeHeader = headers["range"],
+                    output = output,
+                    headOnly = false
+                )
+            }
+
+            "/pkg" -> {
+
+                val id = uri.getQueryParameter("id")?.toIntOrNull()
+
+                if (id == null) {
+                    sendError(
+                        output,
+                        400,
+                        "Missing package id"
+                    )
+                    return
+                }
+
+                val pkg = getPackages()
+                    .firstOrNull { it.id == id }
+
+                if (pkg == null) {
+                    sendError(
+                        output,
+                        404,
+                        "Package not found"
+                    )
+                    return
+                }
+
+                servePackage(
+                    pkg = pkg,
+                    rangeHeader = headers["range"],
+                    output = output,
+                    headOnly = false
+                )
+            }
+
+            else -> {
+
+                val path = uri.path ?: ""
+
+                if (path.startsWith("/pkg/")) {
+
+                    val id = extractPkgId(path)
+
+                    if (id != null) {
+
+                        val pkg = getPackages()
+                            .firstOrNull { it.id == id }
+
+                        if (pkg == null) {
+                            sendError(
+                                output,
+                                404,
+                                "Package not found"
+                            )
+                            return
+                        }
+
+                        servePackage(
+                            pkg = pkg,
+                            rangeHeader = headers["range"],
+                            output = output,
+                            headOnly = false
+                        )
+
+                    } else {
+
+                        sendError(
+                            output,
+                            404,
+                            "Package not found"
+                        )
+                    }
+
+                } else if (path == "/favicon.ico") {
+
+                    sendResponse(
+                        output = output,
+                        status = 204,
+                        statusText = "No Content",
+                        headers = mapOf(
+                            "Content-Length" to "0",
+                            "Connection" to "close"
+                        )
+                    )
+
+                } else {
+
+                    sendError(
+                        output,
+                        404,
+                        "Not Found"
+                    )
+                }
+            }
+        }
+    }
+
+    // ---------------------------------------------------------
+    // HEAD
+    // ---------------------------------------------------------
+
+    private fun handleHead(
+        target: String,
+        headers: Map<String, String>,
+        output: OutputStream
+    ) {
+
+        val uri = Uri.parse(target)
+
+        when (uri.path ?: "/") {
+
+            "/download",
+            "/pkg" -> {
+
+                val id = uri.getQueryParameter("id")?.toIntOrNull()
+
+                if (id == null) {
+                    sendError(
+                        output,
+                        400,
+                        "Missing package id"
+                    )
+                    return
+                }
+
+                val pkg = getPackages()
+                    .firstOrNull { it.id == id }
+
+                if (pkg == null) {
+                    sendError(
+                        output,
+                        404,
+                        "Package not found"
+                    )
+                    return
+                }
+
+                servePackage(
+                    pkg = pkg,
+                    rangeHeader = headers["range"],
+                    output = output,
+                    headOnly = true
+                )
+            }
+
+            else -> {
+
+                val path = uri.path ?: ""
+
+                if (path.startsWith("/pkg/")) {
+
+                    val id = extractPkgId(path)
+
+                    if (id == null) {
+                        sendError(
+                            output,
+                            404,
+                            "Package not found"
+                        )
+                        return
+                    }
+
+                    val pkg = getPackages()
+                        .firstOrNull { it.id == id }
+
+                    if (pkg == null) {
+                        sendError(
+                            output,
+                            404,
+                            "Package not found"
+                        )
+                        return
+                    }
+
+                    servePackage(
+                        pkg = pkg,
+                        rangeHeader = headers["range"],
+                        output = output,
+                        headOnly = true
+                    )
+
+                } else {
+
+                    sendResponse(
+                        output = output,
+                        status = 200,
+                        statusText = "OK",
+                        headers = mapOf(
+                            "Content-Type" to "text/html; charset=utf-8",
+                            "Content-Length" to "0",
+                            "Connection" to "close"
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    // ---------------------------------------------------------
+    // PKG SERVER
+    // ---------------------------------------------------------
+
+    private fun servePackage(
+        pkg: PkgInfo,
+        rangeHeader: String?,
+        output: OutputStream,
+        headOnly: Boolean
+    ) {
+
+        val totalSize = pkg.size
+
+        if (totalSize < 0) {
+            sendError(
+                output,
+                500,
+                "Invalid package size"
+            )
+            return
+        }
+
+        val range = parseRange(
+            rangeHeader,
+            totalSize
+        )
+
+        if (range != null && range.invalid) {
+
+            sendResponse(
+                output = output,
+                status = 416,
+                statusText = "Range Not Satisfiable",
+                headers = mapOf(
+                    "Content-Range" to "bytes */$totalSize",
+                    "Content-Length" to "0",
+                    "Accept-Ranges" to "bytes",
+                    "Connection" to "close",
+                    "Cache-Control" to "no-store"
+                )
+            )
+
+            return
+        }
+
+        val start = range?.start ?: 0L
+        val end = range?.end ?: (totalSize - 1)
+
+        val contentLength =
+            if (totalSize == 0L) {
+                0L
+            } else {
+                end - start + 1
+            }
+
+        val status =
+            if (range != null) {
+                206
+            } else {
+                200
+            }
+
+        val statusText =
+            if (range != null) {
+                "Partial Content"
+            } else {
+                "OK"
+            }
+
+        val filename = sanitizeFileName(pkg.fileName)
+
+        val responseHeaders = linkedMapOf(
+
+            "Content-Type" to "application/octet-stream",
+
+            "Content-Length" to contentLength.toString(),
+
+            "Accept-Ranges" to "bytes",
+
+            "Content-Disposition" to
+                    "attachment; filename=\"${filename}\"",
+
+            "Connection" to "close",
+
+            "Cache-Control" to "no-store",
+
+            "Access-Control-Allow-Origin" to "*"
+        )
+
+        if (range != null) {
+
+            responseHeaders["Content-Range"] =
+                "bytes $start-$end/$totalSize"
+        }
+
+        sendHeaders(
+            output = output,
+            status = status,
+            statusText = statusText,
+            headers = responseHeaders
+        )
+
+        if (headOnly) {
+            output.flush()
+            return
+        }
+
+        if (contentLength <= 0L) {
+            output.flush()
+            return
+        }
+
+        var input: InputStream? = null
+
+        try {
+
+            input = BufferedInputStream(
+                context.contentResolver.openInputStream(pkg.uri)
+                    ?: throw IllegalStateException(
+                        "Unable to open package"
+                    ),
+                1024 * 1024
+            )
+
+            skipFully(
+                input,
+                start
+            )
+
+            val buffer = ByteArray(1024 * 1024)
+
+            var remaining = contentLength
+
+            while (remaining > 0) {
+
+                val wanted =
+                    minOf(
+                        buffer.size.toLong(),
+                        remaining
+                    ).toInt()
+
+                val read = input.read(
+                    buffer,
+                    0,
+                    wanted
+                )
+
+                if (read <= 0) {
+                    break
+                }
+
+                output.write(
+                    buffer,
+                    0,
+                    read
+                )
+
+                remaining -= read
+            }
+
+            output.flush()
 
         } finally {
 
-            activeConnections.decrementAndGet()
-
-            if (activeConnections.get() < 0) {
-                activeConnections.set(0)
+            try {
+                input?.close()
+            } catch (_: Exception) {
             }
         }
     }
 
-    private fun buildHomePage(): String {
+    // ---------------------------------------------------------
+    // RANGE
+    // ---------------------------------------------------------
 
-        val ip =
-            getWifiIpv4Address()
-                ?.hostAddress
-                ?: "SEM WI-FI"
+    private data class ByteRange(
+        val start: Long,
+        val end: Long,
+        val invalid: Boolean = false
+    )
 
-        val packages =
-            getPackages()
+    private fun parseRange(
+        header: String?,
+        totalSize: Long
+    ): ByteRange? {
 
-        val packageHtml =
-            if (packages.isEmpty()) {
-
-                """
-                    <p>
-                        Nenhum arquivo PKG encontrado.
-                    </p>
-                """.trimIndent()
-
-            } else {
-
-                buildString {
-
-                    append("<h2>PKGs disponíveis</h2>")
-
-                    append("<ul>")
-
-                    for (pkg in packages) {
-
-                        val encodedId =
-                            java.net.URLEncoder
-                                .encode(
-                                    pkg.id,
-                                    StandardCharsets.UTF_8.toString()
-                                )
-
-                        append("<li>")
-
-                        append(
-                            "<strong>"
-                        )
-
-                        append(
-                            escapeHtml(
-                                pkg.name
-                            )
-                        )
-
-                        append(
-                            "</strong>"
-                        )
-
-                        append(
-                            " - "
-                        )
-
-                        append(
-                            formatFileSize(
-                                pkg.size
-                            )
-                        )
-
-                        append(
-                            " - "
-                        )
-
-                        append(
-                            "<a href=\"/download?id=$encodedId\">"
-                        )
-
-                        append(
-                            "BAIXAR"
-                        )
-
-                        append(
-                            "</a>"
-                        )
-
-                        append("</li>")
-                    }
-
-                    append("</ul>")
-                }
-            }
-
-        return """
-            <!DOCTYPE html>
-            <html lang="pt-BR">
-
-            <head>
-
-                <meta charset="UTF-8">
-
-                <meta
-                    name="viewport"
-                    content="width=device-width, initial-scale=1.0"
-                >
-
-                <title>GTSTORE</title>
-
-                <style>
-
-                    body {
-                        font-family: sans-serif;
-                        margin: 20px;
-                    }
-
-                    h1 {
-                        margin-bottom: 8px;
-                    }
-
-                    a {
-                        text-decoration: none;
-                    }
-
-                    li {
-                        margin-bottom: 12px;
-                    }
-
-                </style>
-
-            </head>
-
-            <body>
-
-                <h1>GTSTORE</h1>
-
-                <p>
-                    Servidor HTTP funcionando exclusivamente por Wi-Fi.
-                </p>
-
-                <p>
-                    Endereço:
-                    http://$ip:$port
-                </p>
-
-                $packageHtml
-
-                <hr>
-
-                <p>
-                    <a href="/ps4">
-                        Testar compatibilidade PS4
-                    </a>
-                </p>
-
-                <p>
-                    <a href="/api/status">
-                        Ver status da API
-                    </a>
-                </p>
-
-                <p>
-                    <a href="/api/packages">
-                        Ver catálogo JSON
-                    </a>
-                </p>
-
-            </body>
-
-            </html>
-        """.trimIndent()
-    }
-
-    private fun buildStatusJson(): String {
-
-    val ip =
-        getWifiIpv4Address()
-            ?.hostAddress
-            ?: "SEM WI-FI"
-
-    return """
-        {
-            "server": "GTSTORE",
-            "running": ${running.get()},
-            "port": $port,
-            "local_address": "$ip",
-            "network": "WIFI",
-            "active_connections": ${activeConnections.get()}
+        if (header.isNullOrBlank()) {
+            return null
         }
-    """.trimIndent()
-    }
-    
-    private fun buildPs4TestPage(): String {
 
-    return """
-        <html>
-        <head>
-        <title>GTSTORE</title>
-        </head>
-        <body>
-        <h1>GTSTORE</h1>
-        <p>TESTE PS4 OK</p>
-        <p><a href="/api/status">STATUS</a></p>
-        </body>
-        </html>
-    """.trimIndent()
-}
-
-    private fun buildPackagesJson(): String {
-
-        val packages =
-            getPackages()
-
-        val json =
-            StringBuilder()
-
-        json.append("[\n")
-
-        packages.forEachIndexed { index, pkg ->
-
-            json.append("    {\n")
-
-            json.append(
-                "        \"id\": \""
+        if (!header.startsWith("bytes=")) {
+            return ByteRange(
+                0,
+                0,
+                true
             )
+        }
 
-            json.append(
-                escapeJson(
-                    pkg.id
-                )
+        val value = header
+            .substringAfter("bytes=")
+            .trim()
+
+        // Suporte a apenas uma faixa.
+        // Ex.: bytes=1000-1999
+        if (value.contains(",")) {
+            return ByteRange(
+                0,
+                0,
+                true
             )
+        }
 
-            json.append("\",\n")
+        val parts = value.split("-", limit = 2)
 
-            json.append(
-                "        \"name\": \""
+        if (parts.size != 2) {
+            return ByteRange(
+                0,
+                0,
+                true
             )
+        }
 
-            json.append(
-                escapeJson(
-                    pkg.name
-                )
-            )
+        val startText = parts[0].trim()
+        val endText = parts[1].trim()
 
-            json.append("\",\n")
+        // bytes=-500
+        // Últimos 500 bytes.
+        if (startText.isEmpty()) {
 
-            json.append(
-                "        \"size\": "
-            )
-
-            json.append(
-                pkg.size
-            )
-
-            json.append(",\n")
-
-            json.append(
-                "        \"modified\": "
-            )
-
-            json.append(
-                pkg.modified
-            )
-
-            json.append("\n")
-
-            json.append("    }")
+            val suffixLength =
+                endText.toLongOrNull()
 
             if (
-                index <
-                packages.lastIndex
+                suffixLength == null ||
+                suffixLength <= 0 ||
+                totalSize <= 0
             ) {
-                json.append(",")
+                return ByteRange(
+                    0,
+                    0,
+                    true
+                )
             }
 
-            json.append("\n")
+            val actualLength =
+                minOf(
+                    suffixLength,
+                    totalSize
+                )
+
+            return ByteRange(
+                start = totalSize - actualLength,
+                end = totalSize - 1
+            )
         }
 
-        json.append("]")
+        val start = startText.toLongOrNull()
 
-        return json.toString()
+        if (start == null || start < 0) {
+            return ByteRange(
+                0,
+                0,
+                true
+            )
+        }
+
+        if (start >= totalSize) {
+            return ByteRange(
+                0,
+                0,
+                true
+            )
+        }
+
+        val end = if (endText.isEmpty()) {
+
+            totalSize - 1
+
+        } else {
+
+            val parsedEnd =
+                endText.toLongOrNull()
+
+            if (parsedEnd == null || parsedEnd < start) {
+
+                return ByteRange(
+                    0,
+                    0,
+                    true
+                )
+            }
+
+            minOf(
+                parsedEnd,
+                totalSize - 1
+            )
+        }
+
+        return ByteRange(
+            start = start,
+            end = end
+        )
     }
 
-    private fun getPackages(): List<WebPackage> {
+    // ---------------------------------------------------------
+    // SKIP
+    // ---------------------------------------------------------
 
-        return try {
+    private fun skipFully(
+        input: InputStream,
+        amount: Long
+    ) {
 
-            val uriString =
-                context
+        var remaining = amount
+
+        while (remaining > 0) {
+
+            val skipped = input.skip(remaining)
+
+            if (skipped > 0) {
+                remaining -= skipped
+                continue
+            }
+
+            // Alguns ContentProviders podem retornar 0
+            // no skip. Nesse caso avançamos manualmente.
+            val read = input.read()
+
+            if (read == -1) {
+                throw IllegalStateException(
+                    "Unable to seek to requested range"
+                )
+            }
+
+            remaining--
+        }
+    }
+
+    // ---------------------------------------------------------
+    // PKG ID
+    // ---------------------------------------------------------
+
+    private fun extractPkgId(
+        path: String
+    ): Int? {
+
+        /*
+         * Formatos aceitos:
+         *
+         * /pkg/123
+         * /pkg/123/Jogo.pkg
+         */
+
+        val parts = path
+            .removePrefix("/pkg/")
+            .split("/")
+
+        return parts
+            .firstOrNull()
+            ?.toIntOrNull()
+    }
+
+    // ---------------------------------------------------------
+    // PACKAGE SCANNER
+    // ---------------------------------------------------------
+
+    private fun getPackages(): List<PkgInfo> {
+
+        val preferences = context
+            .getSharedPreferences(
+                "GTSTORE",
+                Context.MODE_PRIVATE
+            )
+
+        val uriString =
+            preferences.getString(
+                "pkg_folder_uri",
+                null
+            )
+                ?: context
                     .getSharedPreferences(
-                        "GTSTORE",
+                        context.packageName + "_preferences",
                         Context.MODE_PRIVATE
                     )
                     .getString(
@@ -656,468 +877,552 @@ class HttpServer(
                         null
                     )
 
-            /*
-             * A MainActivity atual salva a preferência
-             * usando getPreferences(MODE_PRIVATE).
-             *
-             * Portanto, também procuramos nessa
-             * preferência específica da Activity.
-             */
-            val activityPreferences =
-                context
-                    .getSharedPreferences(
-                        "${context.packageName}_preferences",
-                        Context.MODE_PRIVATE
-                    )
+        if (uriString.isNullOrBlank()) {
+            return emptyList()
+        }
 
-            val savedUri =
-                uriString
-                    ?: activityPreferences.getString(
-                        "pkg_folder_uri",
-                        null
-                    )
-
-            if (savedUri.isNullOrBlank()) {
-                return emptyList()
-            }
-
-            val treeUri =
-                android.net.Uri.parse(
-                    savedUri
-                )
-
-            val root =
-                DocumentFile.fromTreeUri(
-                    context,
-                    treeUri
-                )
-                    ?: return emptyList()
-
-            val result =
-                mutableListOf<WebPackage>()
-
-            scanPackagesForWeb(
-                root = root,
-                result = result
-            )
-
-            result.sortedBy {
-                it.name.lowercase(
-                    LocaleHolder.locale
-                )
-            }
-
+        val treeUri = try {
+            Uri.parse(uriString)
         } catch (_: Exception) {
-
-            emptyList()
+            return emptyList()
         }
+
+        val root = try {
+            DocumentFile.fromTreeUri(
+                context,
+                treeUri
+            )
+        } catch (_: Exception) {
+            null
+        } ?: return emptyList()
+
+        val result = mutableListOf<PkgInfo>()
+
+        scanDirectory(
+            directory = root,
+            result = result
+        )
+
+        return result
+            .sortedBy {
+                it.fileName.lowercase(Locale.getDefault())
+            }
+            .mapIndexed { index, pkg ->
+                pkg.copy(id = index)
+            }
     }
 
-    private fun scanPackagesForWeb(
-        root: DocumentFile,
-        result: MutableList<WebPackage>
+    private fun scanDirectory(
+        directory: DocumentFile,
+        result: MutableList<PkgInfo>
     ) {
 
-        for (file in root.listFiles()) {
-
-            if (file.isDirectory) {
-
-                scanPackagesForWeb(
-                    root = file,
-                    result = result
-                )
-
-            } else if (
-                file.isFile &&
-                file.name
-                    ?.lowercase(
-                        LocaleHolder.locale
-                    )
-                    ?.endsWith(".pkg") == true
-            ) {
-
-                val name =
-                    file.name
-                        ?: "PKG"
-
-                val uri =
-                    file.uri.toString()
-
-                result.add(
-                    WebPackage(
-                        id =
-                            buildPackageId(
-                                uri
-                            ),
-                        name = name,
-                        uri = uri,
-                        size = file.length(),
-                        modified =
-                            file.lastModified()
-                    )
-                )
-            }
+        val children = try {
+            directory.listFiles()
+        } catch (_: Exception) {
+            emptyArray()
         }
-    }
 
-    private fun handleDownload(
-        socket: Socket,
-        query: String
-    ) {
+        for (file in children) {
 
-        try {
+            try {
 
-            val id =
-                getQueryParameter(
-                    query,
-                    "id"
-                )
+                if (file.isDirectory) {
 
-            if (id.isNullOrBlank()) {
+                    scanDirectory(
+                        directory = file,
+                        result = result
+                    )
 
-                sendResponse(
-                    socket.outputStream,
-                    "400 Bad Request",
-                    "text/plain; charset=utf-8",
-                    "ID do arquivo não informado."
-                )
+                } else if (file.isFile) {
 
-                return
-            }
+                    val name =
+                        file.name ?: continue
 
-            val pkg =
-                getPackages()
-                    .firstOrNull {
-                        it.id == id
-                    }
+                    if (
+                        name.lowercase(Locale.getDefault())
+                            .endsWith(".pkg")
+                    ) {
 
-            if (pkg == null) {
+                        val size =
+                            file.length()
 
-                sendResponse(
-                    socket.outputStream,
-                    "404 Not Found",
-                    "text/plain; charset=utf-8",
-                    "PKG não encontrado."
-                )
-
-                return
-            }
-
-            val uri =
-                android.net.Uri.parse(
-                    pkg.uri
-                )
-
-            val input =
-                context.contentResolver
-                    .openInputStream(uri)
-
-            if (input == null) {
-
-                sendResponse(
-                    socket.outputStream,
-                    "404 Not Found",
-                    "text/plain; charset=utf-8",
-                    "Não foi possível abrir o PKG."
-                )
-
-                return
-            }
-
-            input.use {
-
-                val output =
-                    socket.outputStream
-
-                val fileName =
-                    pkg.name
-
-                val headers =
-                    buildString {
-
-                        append(
-                            "HTTP/1.1 200 OK\r\n"
-                        )
-
-                        append(
-                            "Content-Type: application/octet-stream\r\n"
-                        )
-
-                        append(
-                            "Content-Length: ${pkg.size}\r\n"
-                        )
-
-                        append(
-                            "Content-Disposition: attachment; filename=\""
-                        )
-
-                        append(
-                            escapeHeaderFileName(
-                                fileName
+                        result.add(
+                            PkgInfo(
+                                id = -1,
+                                name = name.removeSuffix(
+                                    ".pkg"
+                                ),
+                                fileName = name,
+                                uri = file.uri,
+                                size = size,
+                                modified =
+                                    file.lastModified()
                             )
                         )
-
-                        append(
-                            "\"\r\n"
-                        )
-
-                        append(
-                            "Connection: close\r\n"
-                        )
-
-                        append(
-                            "Cache-Control: no-store\r\n"
-                        )
-
-                        append(
-                            "Access-Control-Allow-Origin: *\r\n"
-                        )
-
-                        append(
-                            "\r\n"
-                        )
                     }
-
-                output.write(
-                    headers.toByteArray(
-                        StandardCharsets.UTF_8
-                    )
-                )
-
-                val buffer =
-                    ByteArray(
-                        64 * 1024
-                    )
-
-                while (true) {
-
-                    val count =
-                        it.read(
-                            buffer
-                        )
-
-                    if (count <= 0) {
-                        break
-                    }
-
-                    output.write(
-                        buffer,
-                        0,
-                        count
-                    )
                 }
 
-                output.flush()
+            } catch (_: Exception) {
+                // Ignora arquivo que não pôde ser lido.
             }
-
-        } catch (_: Exception) {
-
-            /*
-             * O cliente pode cancelar o download
-             * ou fechar a conexão antes do término.
-             */
         }
     }
 
-    private fun getQueryParameter(
-        query: String,
-        name: String
-    ): String? {
+    // ---------------------------------------------------------
+    // HOME
+    // ---------------------------------------------------------
 
-        if (query.isBlank()) {
-            return null
-        }
+    private fun sendHomePage(
+        output: OutputStream
+    ) {
 
-        val parameters =
-            query.split("&")
+        val status = getStatus()
 
-        for (parameter in parameters) {
+        val html = """
+            <!DOCTYPE html>
+            <html lang="pt-BR">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport"
+                      content="width=device-width,
+                      initial-scale=1.0">
+                <title>GTSTORE</title>
+            </head>
+            <body>
+                <h1>GTSTORE</h1>
 
-            val parts =
-                parameter.split(
-                    "=",
-                    limit = 2
-                )
+                <p>Servidor:
+                    ${if (status.online) "ONLINE" else "OFFLINE"}
+                </p>
 
-            if (
-                parts.size == 2 &&
-                parts[0] == name
-            ) {
+                <p>Endereço:
+                    ${status.url}
+                </p>
 
-                return try {
+                <p>Porta:
+                    ${status.port}
+                </p>
 
-                    URLDecoder.decode(
-                        parts[1],
-                        StandardCharsets.UTF_8.toString()
-                    )
+                <p>Conexões:
+                    ${status.activeConnections}
+                </p>
 
-                } catch (_: Exception) {
+                <p>
+                    <a href="/ps4">
+                        Página PS4
+                    </a>
+                </p>
 
-                    parts[1]
-                }
-            }
-        }
+                <p>
+                    <a href="/api/packages">
+                        API Packages
+                    </a>
+                </p>
 
-        return null
+                <p>
+                    <a href="/api/status">
+                        API Status
+                    </a>
+                </p>
+            </body>
+            </html>
+        """.trimIndent()
+
+        sendText(
+            output,
+            html
+        )
     }
 
-    private fun sendResponse(
-    output: OutputStream,
-    status: String,
-    contentType: String,
-    body: String
-) {
+    // ---------------------------------------------------------
+    // PS4 PAGE
+    // ---------------------------------------------------------
 
-    val bodyBytes =
-        body.toByteArray(
+    private fun sendPs4Page(
+        output: OutputStream
+    ) {
+
+        val packages = getPackages()
+
+        val builder = StringBuilder()
+
+        builder.append(
+            """
+            <!DOCTYPE html>
+            <html lang="pt-BR">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport"
+                      content="width=device-width,
+                      initial-scale=1.0">
+                <title>GTSTORE PS4</title>
+            </head>
+            <body>
+
+            <h1>GTSTORE - PKGs</h1>
+            """.trimIndent()
+        )
+
+        for (pkg in packages) {
+
+            val url =
+                "/pkg/${pkg.id}/${Uri.encode(pkg.fileName)}"
+
+            builder.append(
+                """
+                <div>
+                    <h3>${escapeHtml(pkg.name)}</h3>
+
+                    <p>
+                        ${formatFileSize(pkg.size)}
+                    </p>
+
+                    <p>
+                        <a href="$url">
+                            Download / Install
+                        </a>
+                    </p>
+                </div>
+
+                <hr>
+                """.trimIndent()
+            )
+        }
+
+        builder.append(
+            """
+            </body>
+            </html>
+            """.trimIndent()
+        )
+
+        sendText(
+            output,
+            builder.toString()
+        )
+    }
+
+    // ---------------------------------------------------------
+    // API STATUS
+    // ---------------------------------------------------------
+
+    private fun sendStatusJson(
+        output: OutputStream
+    ) {
+
+        val status = getStatus()
+
+        val json = JSONObject()
+
+        json.put(
+            "online",
+            status.online
+        )
+
+        json.put(
+            "port",
+            status.port
+        )
+
+        json.put(
+            "address",
+            status.address
+        )
+
+        json.put(
+            "url",
+            status.url
+        )
+
+        json.put(
+            "activeConnections",
+            status.activeConnections
+        )
+
+        sendJson(
+            output,
+            json.toString()
+        )
+    }
+
+    // ---------------------------------------------------------
+    // API PACKAGES
+    // ---------------------------------------------------------
+
+    private fun sendPackagesJson(
+        output: OutputStream
+    ) {
+
+        val array = JSONArray()
+
+        for (pkg in getPackages()) {
+
+            val json = JSONObject()
+
+            json.put(
+                "id",
+                pkg.id
+            )
+
+            json.put(
+                "name",
+                pkg.name
+            )
+
+            json.put(
+                "file",
+                pkg.fileName
+            )
+
+            json.put(
+                "size",
+                pkg.size
+            )
+
+            json.put(
+                "modified",
+                pkg.modified
+            )
+
+            json.put(
+                "type",
+                "PKG"
+            )
+
+            json.put(
+                "url",
+                "/pkg/${pkg.id}/${Uri.encode(pkg.fileName)}"
+            )
+
+            array.put(json)
+        }
+
+        sendJson(
+            output,
+            array.toString()
+        )
+    }
+
+    // ---------------------------------------------------------
+    // RESPONSE
+    // ---------------------------------------------------------
+
+    private fun sendText(
+        output: OutputStream,
+        text: String
+    ) {
+
+        val body = text.toByteArray(
             StandardCharsets.UTF_8
         )
 
-    val headers =
-        buildString {
+        sendHeaders(
+            output = output,
+            status = 200,
+            statusText = "OK",
+            headers = mapOf(
+                "Content-Type" to
+                        "text/html; charset=utf-8",
 
-            append("HTTP/1.0 ")
-            append(status)
-            append("\r\n")
+                "Content-Length" to
+                        body.size.toString(),
 
-            append("Content-Type: ")
-            append(contentType)
-            append("\r\n")
+                "Connection" to "close",
 
-            append("Content-Length: ")
-            append(bodyBytes.size)
-            append("\r\n")
+                "Cache-Control" to "no-store"
+            )
+        )
 
-            append("Connection: close\r\n")
+        output.write(body)
+        output.flush()
+    }
 
-            append("\r\n")
+    private fun sendJson(
+        output: OutputStream,
+        json: String
+    ) {
+
+        val body = json.toByteArray(
+            StandardCharsets.UTF_8
+        )
+
+        sendHeaders(
+            output = output,
+            status = 200,
+            statusText = "OK",
+            headers = mapOf(
+                "Content-Type" to
+                        "application/json; charset=utf-8",
+
+                "Content-Length" to
+                        body.size.toString(),
+
+                "Connection" to "close",
+
+                "Cache-Control" to "no-store",
+
+                "Access-Control-Allow-Origin" to "*"
+            )
+        )
+
+        output.write(body)
+        output.flush()
+    }
+
+    private fun sendError(
+        output: OutputStream,
+        status: Int,
+        message: String
+    ) {
+
+        val body = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>$status</title>
+            </head>
+            <body>
+                <h1>$status</h1>
+                <p>${escapeHtml(message)}</p>
+            </body>
+            </html>
+        """.trimIndent()
+            .toByteArray(
+                StandardCharsets.UTF_8
+            )
+
+        sendHeaders(
+            output = output,
+            status = status,
+            statusText = message,
+            headers = mapOf(
+                "Content-Type" to
+                        "text/html; charset=utf-8",
+
+                "Content-Length" to
+                        body.size.toString(),
+
+                "Connection" to "close"
+            )
+        )
+
+        output.write(body)
+        output.flush()
+    }
+
+    private fun sendResponse(
+        output: OutputStream,
+        status: Int,
+        statusText: String,
+        headers: Map<String, String>
+    ) {
+
+        sendHeaders(
+            output,
+            status,
+            statusText,
+            headers
+        )
+
+        output.flush()
+    }
+
+    private fun sendHeaders(
+        output: OutputStream,
+        status: Int,
+        statusText: String,
+        headers: Map<String, String>
+    ) {
+
+        val builder = StringBuilder()
+
+        builder.append(
+            "HTTP/1.1 $status $statusText\r\n"
+        )
+
+        for ((key, value) in headers) {
+
+            builder.append(
+                "$key: $value\r\n"
+            )
         }
 
-    output.write(
-        headers.toByteArray(
-            StandardCharsets.US_ASCII
-        )
-    )
-
-    if (bodyBytes.isNotEmpty()) {
+        builder.append("\r\n")
 
         output.write(
-            bodyBytes
+            builder.toString()
+                .toByteArray(
+                    StandardCharsets.ISO_8859_1
+                )
         )
     }
 
-    output.flush()
-    }
+    // ---------------------------------------------------------
+    // NETWORK
+    // ---------------------------------------------------------
 
-    private fun buildPackageId(
-        path: String
-    ): String {
+    private fun getWifiIpv4Address(): Inet4Address? {
 
         return try {
 
-            val digest =
-                java.security.MessageDigest
-                    .getInstance(
-                        "SHA-256"
-                    )
+            val interfaces =
+                java.net.NetworkInterface
+                    .getNetworkInterfaces()
 
-            val hash =
-                digest.digest(
-                    path.toByteArray(
-                        StandardCharsets.UTF_8
-                    )
-                )
+            while (interfaces.hasMoreElements()) {
 
-            hash.joinToString("") {
-                "%02x".format(it)
+                val networkInterface =
+                    interfaces.nextElement()
+
+                if (!networkInterface.isUp) {
+                    continue
+                }
+
+                if (networkInterface.isLoopback) {
+                    continue
+                }
+
+                val addresses =
+                    networkInterface
+                        .inetAddresses
+
+                while (addresses.hasMoreElements()) {
+
+                    val address =
+                        addresses.nextElement()
+
+                    if (
+                        address is Inet4Address &&
+                        !address.isLoopbackAddress
+                    ) {
+                        return address
+                    }
+                }
             }
 
+            null
+
         } catch (_: Exception) {
-
-            path.hashCode()
-                .toString()
+            null
         }
     }
 
-    private fun formatFileSize(
-        bytes: Long
+    // ---------------------------------------------------------
+    // HELPERS
+    // ---------------------------------------------------------
+
+    private fun sanitizeFileName(
+        name: String
     ): String {
 
-        if (bytes < 1024) {
-            return "$bytes B"
-        }
-
-        val kb =
-            bytes / 1024.0
-
-        if (kb < 1024) {
-
-            return String.format(
-                LocaleHolder.locale,
-                "%.2f KB",
-                kb
-            )
-        }
-
-        val mb =
-            kb / 1024.0
-
-        if (mb < 1024) {
-
-            return String.format(
-                LocaleHolder.locale,
-                "%.2f MB",
-                mb
-            )
-        }
-
-        val gb =
-            mb / 1024.0
-
-        if (gb < 1024) {
-
-            return String.format(
-                LocaleHolder.locale,
-                "%.2f GB",
-                gb
-            )
-        }
-
-        val tb =
-            gb / 1024.0
-
-        return String.format(
-            LocaleHolder.locale,
-            "%.2f TB",
-            tb
-        )
-    }
-
-    private fun escapeJson(
-        value: String
-    ): String {
-
-        return value
-            .replace(
-                "\\",
-                "\\\\"
-            )
-            .replace(
-                "\"",
-                "\\\""
-            )
-            .replace(
-                "\n",
-                "\\n"
-            )
-            .replace(
-                "\r",
-                "\\r"
-            )
-            .replace(
-                "\t",
-                "\\t"
-            )
+        return name
+            .replace("\\", "_")
+            .replace("\"", "_")
+            .replace("\r", "_")
+            .replace("\n", "_")
+            .replace("/", "_")
     }
 
     private fun escapeHtml(
@@ -1125,96 +1430,45 @@ class HttpServer(
     ): String {
 
         return value
-            .replace(
-                "&",
-                "&amp;"
-            )
-            .replace(
-                "<",
-                "&lt;"
-            )
-            .replace(
-                ">",
-                "&gt;"
-            )
-            .replace(
-                "\"",
-                "&quot;"
-            )
-            .replace(
-                "'",
-                "&#39;"
-            )
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&#39;")
     }
 
-    private fun escapeHeaderFileName(
-        value: String
+    private fun formatFileSize(
+        size: Long
     ): String {
 
-        return value
-            .replace(
-                "\\",
-                "_"
-            )
-            .replace(
-                "\"",
-                "_"
-            )
-            .replace(
-                "\r",
-                "_"
-            )
-            .replace(
-                "\n",
-                "_"
-            )
-    }
-
-    private fun isPrivateIpv4(
-        address: Inet4Address
-    ): Boolean {
-
-        val bytes =
-            address.address
-
-        val first =
-            bytes[0].toInt() and 0xFF
-
-        val second =
-            bytes[1].toInt() and 0xFF
-
-        return when {
-
-            first == 10 -> {
-                true
-            }
-
-            first == 172 &&
-                second in 16..31 -> {
-                true
-            }
-
-            first == 192 &&
-                second == 168 -> {
-                true
-            }
-
-            else -> {
-                false
-            }
+        if (size <= 0) {
+            return "0 B"
         }
-    }
 
-    private data class WebPackage(
-        val id: String,
-        val name: String,
-        val uri: String,
-        val size: Long,
-        val modified: Long
-    )
+        val units = arrayOf(
+            "B",
+            "KB",
+            "MB",
+            "GB",
+            "TB"
+        )
 
-    private object LocaleHolder {
-        val locale =
-            java.util.Locale.getDefault()
+        var value = size.toDouble()
+        var index = 0
+
+        while (
+            value >= 1024 &&
+            index < units.size - 1
+        ) {
+            value /= 1024
+            index++
+        }
+
+        return String.format(
+            Locale.US,
+            "%.2f %s",
+            value,
+            units[index]
+        )
     }
 }
