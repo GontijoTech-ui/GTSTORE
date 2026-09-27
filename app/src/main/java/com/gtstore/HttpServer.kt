@@ -281,9 +281,7 @@ class HttpServer(
 
                     "OPTIONS" -> {
 
-                        sendOptions(
-                            output
-                        )
+                        sendOptions(output)
                     }
 
                     else -> {
@@ -419,12 +417,9 @@ class HttpServer(
 
             path.startsWith("/pkg/") -> {
 
-                val segments =
+                val id =
                     path.removePrefix("/pkg/")
                         .split("/")
-
-                val id =
-                    segments
                         .firstOrNull()
                         ?.toIntOrNull()
 
@@ -524,11 +519,7 @@ class HttpServer(
 
         if (!rangeHeader.isNullOrBlank()) {
 
-            if (
-                !rangeHeader.startsWith(
-                    "bytes="
-                )
-            ) {
+            if (!rangeHeader.startsWith("bytes=")) {
 
                 sendRangeError(
                     output,
@@ -586,8 +577,7 @@ class HttpServer(
                             ) {
                                 0L
                             } else {
-                                totalSize -
-                                    suffixLength
+                                totalSize - suffixLength
                             }
 
                         end =
@@ -656,9 +646,7 @@ class HttpServer(
                             return
                         }
 
-                        if (
-                            end >= totalSize
-                        ) {
+                        if (end >= totalSize) {
                             end =
                                 totalSize - 1
                         }
@@ -686,11 +674,7 @@ class HttpServer(
             }
 
         val statusCode =
-            if (partial) {
-                206
-            } else {
-                200
-            }
+            if (partial) 206 else 200
 
         val statusText =
             if (partial) {
@@ -702,45 +686,30 @@ class HttpServer(
         val responseHeaders =
             LinkedHashMap<String, String>()
 
-        responseHeaders[
-            "Accept-Ranges"
-        ] = "bytes"
+        responseHeaders["Accept-Ranges"] =
+            "bytes"
 
-        responseHeaders[
-            "Content-Length"
-        ] =
+        responseHeaders["Content-Length"] =
             contentLength.toString()
 
-        responseHeaders[
-            "Content-Type"
-        ] =
+        responseHeaders["Content-Type"] =
             "application/octet-stream"
 
-        responseHeaders[
-            "Content-Disposition"
-        ] =
+        responseHeaders["Content-Disposition"] =
             "attachment; filename=\"${sanitizeFileName(packageInfo.fileName)}\""
 
-        responseHeaders[
-            "Cache-Control"
-        ] =
+        responseHeaders["Cache-Control"] =
             "no-cache"
 
-        responseHeaders[
-            "Access-Control-Allow-Origin"
-        ] =
+        responseHeaders["Access-Control-Allow-Origin"] =
             "*"
 
-        responseHeaders[
-            "Access-Control-Expose-Headers"
-        ] =
+        responseHeaders["Access-Control-Expose-Headers"] =
             "Content-Length, Content-Range, Accept-Ranges"
 
         if (partial) {
 
-            responseHeaders[
-                "Content-Range"
-            ] =
+            responseHeaders["Content-Range"] =
                 "bytes $start-$end/$totalSize"
         }
 
@@ -768,21 +737,18 @@ class HttpServer(
         try {
 
             context.contentResolver
-                .openInputStream(
-                    packageInfo.uri
-                )
+                .openInputStream(packageInfo.uri)
                 ?.use { input ->
 
                     skipFully(
-                        input = input,
-                        bytes = start
+                        input,
+                        start
                     )
 
                     streamRange(
-                        input = input,
-                        output = output,
-                        bytesToSend =
-                            contentLength
+                        input,
+                        output,
+                        contentLength
                     )
                 }
 
@@ -881,19 +847,13 @@ class HttpServer(
 
         val uriString =
             savedUri
-                ?: run {
-
-                    val activityPreferences =
-                        context.getSharedPreferences(
-                            "GTSTORE_PREFS",
-                            Context.MODE_PRIVATE
-                        )
-
-                    activityPreferences.getString(
-                        "pkg_folder_uri",
-                        null
-                    )
-                }
+                ?: context.getSharedPreferences(
+                    "GTSTORE_PREFS",
+                    Context.MODE_PRIVATE
+                ).getString(
+                    "pkg_folder_uri",
+                    null
+                )
 
         if (uriString.isNullOrBlank()) {
             return emptyList()
@@ -936,21 +896,20 @@ class HttpServer(
                         ?.endsWith(".pkg") == true
             }
             .sortedBy {
+
                 it.name?.lowercase() ?: ""
             }
             .mapIndexed { index, file ->
 
                 val name =
-                    file.name
-                        ?: "package.pkg"
+                    file.name ?: "package.pkg"
 
                 PackageInfo(
                     id = index + 1,
                     name = name,
                     fileName = name,
                     size = file.length(),
-                    modified =
-                        file.lastModified(),
+                    modified = file.lastModified(),
                     type = "PKG",
                     uri = file.uri
                 )
@@ -1001,42 +960,19 @@ class HttpServer(
             val item =
                 JSONObject()
 
-            item.put(
-                "id",
-                pkg.id
-            )
-
-            item.put(
-                "name",
-                pkg.name
-            )
-
-            item.put(
-                "file",
-                pkg.fileName
-            )
-
-            item.put(
-                "size",
-                pkg.size
-            )
-
+            item.put("id", pkg.id)
+            item.put("name", pkg.name)
+            item.put("file", pkg.fileName)
+            item.put("size", pkg.size)
             item.put(
                 "formattedSize",
-                formatFileSize(
-                    pkg.size
-                )
+                formatFileSize(pkg.size)
             )
-
             item.put(
                 "modified",
                 pkg.modified
             )
-
-            item.put(
-                "type",
-                pkg.type
-            )
+            item.put("type", pkg.type)
 
             item.put(
                 "url",
@@ -1185,23 +1121,31 @@ class HttpServer(
 
 body {
     margin: 0;
-    padding: 30px;
+    padding: 25px;
     background: #101114;
-    color: #ffffff;
-    font-family: Arial, Helvetica, sans-serif;
+    color: #fff;
+    font-family:
+        Arial,
+        Helvetica,
+        sans-serif;
 }
 
 .container {
     max-width: 850px;
-    margin: 0 auto;
+    margin: auto;
 }
 
 h1 {
     margin-top: 0;
+    color: #fff;
+}
+
+h2 {
+    margin-top: 0;
 }
 
 .subtitle {
-    color: #aaa;
+    color: #999;
     margin-bottom: 25px;
 }
 
@@ -1209,12 +1153,14 @@ h1 {
     background: #1b1d22;
     border-radius: 12px;
     padding: 20px;
-    margin-bottom: 20px;
+    margin-bottom: 18px;
+    border: 1px solid #292c33;
 }
 
 label {
     display: block;
     margin-bottom: 8px;
+    color: #aaa;
     font-weight: bold;
 }
 
@@ -1222,12 +1168,12 @@ input,
 select {
     width: 100%;
     padding: 13px;
-    border: 1px solid #444;
-    border-radius: 7px;
+    margin-bottom: 15px;
     background: #0f1013;
     color: #fff;
+    border: 1px solid #444;
+    border-radius: 7px;
     font-size: 16px;
-    margin-bottom: 15px;
 }
 
 button {
@@ -1235,11 +1181,12 @@ button {
     padding: 14px;
     border: 0;
     border-radius: 7px;
-    background: #003791;
-    color: #fff;
+    background: #0070d1;
+    color: white;
     font-size: 16px;
     font-weight: bold;
     cursor: pointer;
+    margin-top: 5px;
 }
 
 button:disabled {
@@ -1252,49 +1199,67 @@ button:disabled {
 }
 
 .status {
-    padding: 14px;
-    border-radius: 8px;
     background: #111317;
+    border-radius: 8px;
+    padding: 15px;
+    line-height: 1.8;
+    word-break: break-word;
 }
 
 .online {
     color: #4caf50;
+    font-weight: bold;
 }
 
 .offline {
     color: #f44336;
+    font-weight: bold;
 }
 
 .pkg-info {
-    margin-top: 15px;
-    padding: 15px;
     background: #111317;
     border-radius: 8px;
-    line-height: 1.6;
+    padding: 15px;
+    margin-bottom: 15px;
+    line-height: 1.7;
     word-break: break-word;
 }
 
 #log {
+    min-height: 180px;
+    max-height: 350px;
+    overflow-y: auto;
     white-space: pre-wrap;
     word-break: break-word;
     background: #08090b;
     border: 1px solid #333;
     border-radius: 8px;
     padding: 15px;
-    min-height: 120px;
     font-family: monospace;
+    font-size: 13px;
+    color: #00ff66;
 }
 
 .success {
-    color: #4caf50;
+    color: #00ff66 !important;
 }
 
 .error {
-    color: #ff5252;
+    color: #ff5252 !important;
 }
 
 .warning {
-    color: #ffca28;
+    color: #ffca28 !important;
+}
+
+.info {
+    color: #61dafb !important;
+}
+
+.small {
+    color: #777;
+    font-size: 12px;
+    line-height: 1.5;
 }
 
 </style>
@@ -1308,7 +1273,7 @@ button:disabled {
 <h1>GTSTORE</h1>
 
 <div class="subtitle">
-Instalador remoto de PKG para PS4
+PS4 Remote PKG Installer
 </div>
 
 
@@ -1327,7 +1292,7 @@ Servidor GTSTORE:
 ${if (status.running) " ONLINE" else " OFFLINE"}
 </span>
 
-<br><br>
+<br>
 
 <strong>
 URL:
@@ -1335,6 +1300,26 @@ URL:
 
 <span id="serverUrl">
 ${escapeHtml(status.url)}
+</span>
+
+<br>
+
+<strong>
+Porta:
+</strong>
+
+<span>
+${status.port}
+</span>
+
+<br>
+
+<strong>
+Conexões:
+</strong>
+
+<span id="connections">
+${status.activeConnections}
 </span>
 
 </div>
@@ -1353,14 +1338,14 @@ IP do PS4
 <input
     type="text"
     id="ps4ip"
-    placeholder="Ex: 192.168.1.150"
+    placeholder="Ex: 192.168.0.3"
 >
 
 <button
-    onclick="testarPS4()"
     class="secondary"
+    onclick="testarPS4()"
 >
-Testar conexão com PS4
+Testar PS4
 </button>
 
 </div>
@@ -1371,7 +1356,7 @@ Testar conexão com PS4
 <h2>PKG</h2>
 
 <label for="pkgSelect">
-Selecione o PKG
+Pacote disponível
 </label>
 
 <select
@@ -1396,10 +1381,10 @@ Nenhum PKG selecionado.
 
 <button
     id="installButton"
-    onclick="enviarPkg()"
+    onclick="iniciarInstalacao()"
     disabled
 >
-Enviar e instalar no PS4
+Enviar jogo para o PS4
 </button>
 
 </div>
@@ -1407,10 +1392,39 @@ Enviar e instalar no PS4
 
 <div class="panel">
 
-<h2>Status / Console</h2>
+<h2>Console</h2>
 
 <div id="log">
-Aguardando comando...
+&gt; GTSTORE iniciado.
+&gt; Aguardando comando...
+</div>
+
+</div>
+
+
+<div class="panel">
+
+<div class="small">
+
+Fluxo experimental:
+
+<br>
+
+1. POST HTTP para porta 12800.
+
+<br>
+
+2. Se falhar, tentativa WebSocket na porta 9090.
+
+<br>
+
+3. Após 9090, nova tentativa em 12800.
+
+<br><br>
+
+A comunicação com a porta 9090 depende do serviço realmente
+estar aceitando WebSocket e o protocolo utilizado.
+
 </div>
 
 </div>
@@ -1425,26 +1439,26 @@ let packages = [];
 let selectedPackage = null;
 
 
-function getServerBaseUrl() {
-
-    return window.location.origin;
-
-}
-
-
-function log(
-    message,
-    type = ""
-) {
+function log(message, type) {
 
     const logDiv =
         document.getElementById("log");
 
-    logDiv.className = type;
+    if (type) {
+        logDiv.className = type;
+    }
 
-    logDiv.innerText =
-        message;
+    logDiv.innerText +=
+        "\\n> " + message;
 
+    logDiv.scrollTop =
+        logDiv.scrollHeight;
+}
+
+
+function getServerBaseUrl() {
+
+    return window.location.origin;
 }
 
 
@@ -1459,14 +1473,6 @@ async function carregarStatus() {
                     cache: "no-cache"
                 }
             );
-
-        if (!response.ok) {
-
-            throw new Error(
-                "HTTP " +
-                response.status
-            );
-        }
 
         const data =
             await response.json();
@@ -1491,23 +1497,22 @@ async function carregarStatus() {
         ).innerText =
             data.url;
 
+        document.getElementById(
+            "connections"
+        ).innerText =
+            data.activeConnections;
+
     } catch (error) {
 
-        const status =
-            document.getElementById(
-                "serverStatus"
-            );
-
-        status.innerText =
+        document.getElementById(
+            "serverStatus"
+        ).innerText =
             " OFFLINE";
 
-        status.className =
-            "offline";
-
         document.getElementById(
-            "serverUrl"
-        ).innerText =
-            getServerBaseUrl();
+            "serverStatus"
+        ).className =
+            "offline";
     }
 }
 
@@ -1557,26 +1562,27 @@ async function carregarPackages() {
             option.textContent =
                 "Nenhum PKG encontrado";
 
-            select.appendChild(
-                option
+            select.appendChild(option);
+
+            log(
+                "Nenhum PKG encontrado.",
+                "warning"
             );
 
             return;
         }
 
-        const firstOption =
+        const first =
             document.createElement(
                 "option"
             );
 
-        firstOption.value = "";
+        first.value = "";
 
-        firstOption.textContent =
+        first.textContent =
             "Selecione um PKG...";
 
-        select.appendChild(
-            firstOption
-        );
+        select.appendChild(first);
 
         packages.forEach(
             function(pkg) {
@@ -1595,15 +1601,14 @@ async function carregarPackages() {
                     pkg.formattedSize +
                     ")";
 
-                select.appendChild(
-                    option
-                );
+                select.appendChild(option);
             }
         );
 
         log(
             packages.length +
-            " PKG(s) carregado(s)."
+            " PKG(s) carregado(s).",
+            "info"
         );
 
     } catch (error) {
@@ -1620,12 +1625,10 @@ async function carregarPackages() {
         option.textContent =
             "Erro ao carregar PKGs";
 
-        select.appendChild(
-            option
-        );
+        select.appendChild(option);
 
         log(
-            "Erro ao carregar PKGs.\\n\\n" +
+            "Erro ao carregar PKGs: " +
             error.message,
             "error"
         );
@@ -1641,9 +1644,7 @@ function mostrarPkg() {
         );
 
     const id =
-        parseInt(
-            select.value
-        );
+        parseInt(select.value);
 
     selectedPackage =
         packages.find(
@@ -1672,7 +1673,7 @@ function mostrarPkg() {
         return;
     }
 
-    const pkgUrl =
+    const url =
         getServerBaseUrl() +
         selectedPackage.url;
 
@@ -1681,24 +1682,26 @@ function mostrarPkg() {
         escapeHtml(
             selectedPackage.name
         ) +
+
         "<br>" +
 
         "<strong>Tamanho:</strong> " +
         escapeHtml(
             selectedPackage.formattedSize
         ) +
+
         "<br>" +
 
         "<strong>Tipo:</strong> " +
         escapeHtml(
             selectedPackage.type
         ) +
+
         "<br><br>" +
 
-        "<strong>URL do PKG:</strong><br>" +
-        escapeHtml(
-            pkgUrl
-        );
+        "<strong>URL:</strong><br>" +
+
+        escapeHtml(url);
 
     button.disabled = false;
 }
@@ -1721,17 +1724,28 @@ async function testarPS4() {
         return;
     }
 
+    log(
+        "Testando porta 12800...",
+        "info"
+    );
+
     const endpoint =
         "http://" +
         ip +
         ":12800/api/is_exists";
 
-    log(
-        "Testando comunicação com o PS4...\\n\\n" +
-        endpoint
-    );
-
     try {
+
+        const controller =
+            new AbortController();
+
+        const timeout =
+            setTimeout(
+                function() {
+                    controller.abort();
+                },
+                3000
+            );
 
         const response =
             await fetch(
@@ -1748,16 +1762,20 @@ async function testarPS4() {
                         JSON.stringify({
                             title_id:
                                 "CUSA00000"
-                        })
+                        }),
+
+                    signal:
+                        controller.signal
                 }
             );
+
+        clearTimeout(timeout);
 
         const text =
             await response.text();
 
         log(
-            "Resposta do PS4:\\n\\n" +
-            "HTTP: " +
+            "12800 respondeu HTTP " +
             response.status +
             "\\n\\n" +
             text,
@@ -1769,21 +1787,23 @@ async function testarPS4() {
     } catch (error) {
 
         log(
-            "Falha ao conectar com o PS4.\\n\\n" +
-            "Verifique:\\n" +
-            "• IP do PS4\\n" +
-            "• RPI ativo\\n" +
-            "• Porta 12800\\n" +
-            "• Mesma rede local\\n\\n" +
-            "Erro:\\n" +
+            "12800 inacessível.\\n" +
             error.message,
             "error"
+        );
+
+        log(
+            "Isso não significa necessariamente que o PS4 esteja offline."
+        );
+
+        log(
+            "A próxima etapa será a porta 9090."
         );
     }
 }
 
 
-async function enviarPkg() {
+async function iniciarInstalacao() {
 
     const ip =
         document
@@ -1813,20 +1833,6 @@ async function enviarPkg() {
         getServerBaseUrl() +
         selectedPackage.url;
 
-    const endpoint =
-        "http://" +
-        ip +
-        ":12800/api/install";
-
-    const payload = {
-
-        type: "direct",
-
-        packages: [
-            pkgUrl
-        ]
-    };
-
     const button =
         document.getElementById(
             "installButton"
@@ -1835,18 +1841,104 @@ async function enviarPkg() {
     button.disabled = true;
 
     log(
-        "Enviando instalação para o PS4...\\n\\n" +
-
-        "Endpoint:\\n" +
-        endpoint +
-
-        "\\n\\nPKG:\\n" +
-        pkgUrl +
-
-        "\\n\\nAguardando resposta do RPI..."
+        "--------------------------------"
     );
 
+    log(
+        "Iniciando instalação..."
+    );
+
+    log(
+        "PS4: " + ip
+    );
+
+    log(
+        "PKG: " +
+        selectedPackage.name
+    );
+
+    log(
+        "URL: " +
+        pkgUrl
+    );
+
+    log(
+        "ETAPA 1: POST HTTP 12800..."
+    );
+
+    const sucesso =
+        await tentarApiRest(
+            ip,
+            pkgUrl
+        );
+
+    if (sucesso) {
+
+        log(
+            "Instalação aceita pela API 12800.",
+            "success"
+        );
+
+        button.disabled = false;
+
+        return;
+    }
+
+    log(
+        "12800 não respondeu ou recusou.",
+        "warning"
+    );
+
+    log(
+        "ETAPA 2: tentando porta 9090..."
+    );
+
+    const ativado =
+        await ativarEEnviarPorSocket(
+            ip,
+            pkgUrl
+        );
+
+    if (!ativado) {
+
+        log(
+            "9090 também não completou a operação.",
+            "error"
+        );
+
+    }
+
+    button.disabled = false;
+}
+
+
+async function tentarApiRest(
+    ip,
+    pkgUrl
+) {
+
     try {
+
+        const controller =
+            new AbortController();
+
+        const timeoutId =
+            setTimeout(
+                function() {
+                    controller.abort();
+                },
+                3000
+            );
+
+        const endpoint =
+            "http://" +
+            ip +
+            ":12800/api/install";
+
+        log(
+            "POST: " +
+            endpoint
+        );
 
         const response =
             await fetch(
@@ -1860,88 +1952,264 @@ async function enviarPkg() {
                     },
 
                     body:
-                        JSON.stringify(
-                            payload
-                        )
+                        JSON.stringify({
+                            type: "direct",
+
+                            packages: [
+                                pkgUrl
+                            ]
+                        }),
+
+                    signal:
+                        controller.signal
                 }
             );
+
+        clearTimeout(timeoutId);
 
         const text =
             await response.text();
 
-        let responseText =
-            text;
-
-        try {
-
-            const json =
-                JSON.parse(text);
-
-            responseText =
-                JSON.stringify(
-                    json,
-                    null,
-                    2
-                );
-
-        } catch (_) {
-        }
-
         if (response.ok) {
 
             log(
-                "[SUCESSO]\\n\\n" +
-
-                "O RPI aceitou a requisição.\\n\\n" +
-
-                "HTTP: " +
-                response.status +
-
-                "\\n\\nResposta:\\n" +
-                responseText +
-
-                "\\n\\nURL enviada ao PS4:\\n" +
-                pkgUrl,
-
+                "HTTP " +
+                response.status,
                 "success"
             );
 
-        } else {
-
             log(
-                "[ERRO]\\n\\n" +
-
-                "O RPI respondeu HTTP " +
-                response.status +
-
-                "\\n\\nResposta:\\n" +
-                responseText,
-
-                "error"
+                "Resposta: " +
+                text,
+                "success"
             );
+
+            return true;
         }
+
+        log(
+            "12800 respondeu HTTP " +
+            response.status,
+            "warning"
+        );
+
+        log(
+            text
+        );
+
+        return false;
 
     } catch (error) {
 
         log(
-            "[FALHA DE CONEXÃO]\\n\\n" +
-
-            "O navegador do PS4 não conseguiu " +
-            "enviar a requisição ao RPI.\\n\\n" +
-
-            "Endpoint:\\n" +
-            endpoint +
-
-            "\\n\\nErro:\\n" +
+            "Erro 12800: " +
             error.message,
-
-            "error"
+            "warning"
         );
 
-    } finally {
-
-        button.disabled = false;
+        return false;
     }
+}
+
+
+function ativarEEnviarPorSocket(
+    ip,
+    pkgUrl
+) {
+
+    return new Promise(
+        function(resolve) {
+
+            let finalizado = false;
+
+            function terminar(resultado) {
+
+                if (finalizado) {
+                    return;
+                }
+
+                finalizado = true;
+
+                resolve(resultado);
+            }
+
+            try {
+
+                log(
+                    "Abrindo WebSocket ws://" +
+                    ip +
+                    ":9090..."
+                );
+
+                const ws =
+                    new WebSocket(
+                        "ws://" +
+                        ip +
+                        ":9090"
+                    );
+
+                ws.binaryType =
+                    "arraybuffer";
+
+                ws.onopen =
+                    function() {
+
+                        log(
+                            "Conexão WebSocket 9090 aberta.",
+                            "success"
+                        );
+
+                        log(
+                            "Enviando payload experimental..."
+                        );
+
+                        const payload =
+                            new Uint8Array([
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x01,
+                                0x02,
+                                0x03,
+                                0x04
+                            ]);
+
+                        try {
+
+                            ws.send(
+                                payload.buffer
+                            );
+
+                            log(
+                                "Payload enviado."
+                            );
+
+                        } catch (error) {
+
+                            log(
+                                "Erro ao enviar payload: " +
+                                error.message,
+                                "error"
+                            );
+
+                            try {
+                                ws.close();
+                            } catch (_) {
+                            }
+
+                            terminar(false);
+
+                            return;
+                        }
+
+                        setTimeout(
+                            async function() {
+
+                                try {
+                                    ws.close();
+                                } catch (_) {
+                                }
+
+                                log(
+                                    "9090 finalizado."
+                                );
+
+                                log(
+                                    "Tentando novamente 12800..."
+                                );
+
+                                const sucesso =
+                                    await tentarApiRest(
+                                        ip,
+                                        pkgUrl
+                                    );
+
+                                if (sucesso) {
+
+                                    log(
+                                        "Instalação aceita após 9090.",
+                                        "success"
+                                    );
+
+                                    terminar(true);
+
+                                } else {
+
+                                    log(
+                                        "Não foi possível registrar a URL após 9090.",
+                                        "error"
+                                    );
+
+                                    terminar(false);
+                                }
+
+                            },
+                            1500
+                        );
+                    };
+
+                ws.onmessage =
+                    function(event) {
+
+                        log(
+                            "Mensagem recebida da 9090."
+                        );
+
+                        if (
+                            typeof event.data ===
+                            "string"
+                        ) {
+
+                            log(
+                                event.data
+                            );
+
+                        } else {
+
+                            log(
+                                "Resposta binária recebida."
+                            );
+                        }
+                    };
+
+                ws.onerror =
+                    function() {
+
+                        log(
+                            "Falha ao abrir WebSocket na porta 9090.",
+                            "error"
+                        );
+
+                        log(
+                            "A porta pode aceitar TCP/HTTP POST, mas não WebSocket."
+                        );
+
+                        terminar(false);
+                    };
+
+                ws.onclose =
+                    function() {
+
+                        if (!finalizado) {
+
+                            log(
+                                "Conexão 9090 fechada."
+                            );
+                        }
+                    };
+
+            } catch (error) {
+
+                log(
+                    "Erro 9090: " +
+                    error.message,
+                    "error"
+                );
+
+                terminar(false);
+            }
+        }
+    );
 }
 
 
@@ -1984,6 +2252,10 @@ window.addEventListener(
 
         carregarPackages();
 
+        setInterval(
+            carregarStatus,
+            3000
+        );
     }
 );
 
@@ -1992,7 +2264,7 @@ window.addEventListener(
 </body>
 
 </html>
-""".trimIndent()
+            """.trimIndent()
 
         val body =
             html.toByteArray(
@@ -2119,9 +2391,7 @@ window.addEventListener(
             "Connection: close\r\n"
         )
 
-        for (
-            entry in headers
-        ) {
+        for (entry in headers) {
 
             builder.append(
                 entry.key
@@ -2163,20 +2433,14 @@ window.addEventListener(
         val body =
             """
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <title>$statusCode</title>
 </head>
-
 <body>
-
 <h1>$statusCode</h1>
-
-<p>
-${escapeHtml(message)}
-</p>
-
+<p>${escapeHtml(message)}</p>
 </body>
 </html>
             """.trimIndent()
@@ -2208,8 +2472,10 @@ ${escapeHtml(message)}
             extraHeaders = mapOf(
                 "Content-Range" to
                     "bytes */$totalSize",
+
                 "Accept-Ranges" to
                     "bytes",
+
                 "Access-Control-Allow-Origin" to
                     "*"
             )
@@ -2235,28 +2501,20 @@ ${escapeHtml(message)}
                 in interfaces
             ) {
 
-                if (
-                    !networkInterface.isUp
-                ) {
+                if (!networkInterface.isUp) {
                     continue
                 }
 
-                if (
-                    networkInterface.isLoopback
-                ) {
+                if (networkInterface.isLoopback) {
                     continue
                 }
 
                 val addresses =
                     Collections.list(
-                        networkInterface
-                            .inetAddresses
+                        networkInterface.inetAddresses
                     )
 
-                for (
-                    address
-                    in addresses
-                ) {
+                for (address in addresses) {
 
                     if (
                         address is Inet4Address &&
@@ -2264,9 +2522,7 @@ ${escapeHtml(message)}
                         !address.isLinkLocalAddress
                     ) {
 
-                        candidates.add(
-                            address
-                        )
+                        candidates.add(address)
                     }
                 }
             }
@@ -2330,18 +2586,9 @@ ${escapeHtml(message)}
     ): String {
 
         return name
-            .replace(
-                "\"",
-                "_"
-            )
-            .replace(
-                "\r",
-                "_"
-            )
-            .replace(
-                "\n",
-                "_"
-            )
+            .replace("\"", "_")
+            .replace("\r", "_")
+            .replace("\n", "_")
     }
 
     private fun escapeHtml(
@@ -2349,30 +2596,10 @@ ${escapeHtml(message)}
     ): String {
 
         return text
-
-            .replace(
-                "&",
-                "&amp;"
-            )
-
-            .replace(
-                "<",
-                "&lt;"
-            )
-
-            .replace(
-                ">",
-                "&gt;"
-            )
-
-            .replace(
-                "\"",
-                "&quot;"
-            )
-
-            .replace(
-                "'",
-                "&#39;"
-            )
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&#39;")
     }
 }
