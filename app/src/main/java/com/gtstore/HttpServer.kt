@@ -6,6 +6,7 @@ import androidx.documentfile.provider.DocumentFile
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
+import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.io.OutputStream
@@ -26,6 +27,15 @@ class HttpServer(
     companion object {
         private const val BUFFER_SIZE = 64 * 1024
         private const val MAX_HEADER_SIZE = 64 * 1024
+        private const val MAX_POST_SIZE = 1024 * 1024
+
+        private const val PAYLOAD_DIR = "payloads"
+
+        private val ALLOWED_PAYLOADS = setOf(
+            "rpi_installer.bin",
+            "direct-installer.bin",
+            "ps4-rpi.bin"
+        )
     }
 
     private var serverSocket: ServerSocket? = null
@@ -34,7 +44,8 @@ class HttpServer(
     var running = false
         private set
 
-    private val executor = Executors.newCachedThreadPool()
+    private val executor =
+        Executors.newCachedThreadPool()
 
     private val activeConnections =
         AtomicInteger(0)
@@ -175,7 +186,7 @@ class HttpServer(
                     BufferedReader(
                         InputStreamReader(
                             client.getInputStream(),
-                            StandardCharsets.UTF_8
+                            StandardCharsets.ISO_8859_1
                         )
                     )
 
@@ -257,6 +268,37 @@ class HttpServer(
                     }
                 }
 
+                val contentLength =
+                    headers["content-length"]
+                        ?.toIntOrNull()
+                        ?: 0
+
+                if (contentLength < 0 ||
+                    contentLength > MAX_POST_SIZE
+                ) {
+
+                    sendError(
+                        output,
+                        413,
+                        "Request Entity Too Large"
+                    )
+
+                    return
+                }
+
+                val body =
+                    if (
+                        method == "POST" &&
+                        contentLength > 0
+                    ) {
+                        readRequestBody(
+                            client.getInputStream(),
+                            contentLength
+                        )
+                    } else {
+                        ByteArray(0)
+                    }
+
                 when (method) {
 
                     "GET" -> {
@@ -279,6 +321,16 @@ class HttpServer(
                         )
                     }
 
+                    "POST" -> {
+
+                        handlePostRequest(
+                            target = target,
+                            headers = headers,
+                            body = body,
+                            output = output
+                        )
+                    }
+
                     "OPTIONS" -> {
 
                         sendOptions(output)
@@ -292,7 +344,7 @@ class HttpServer(
                             "Method Not Allowed",
                             mapOf(
                                 "Allow" to
-                                    "GET, HEAD, OPTIONS"
+                                    "GET, HEAD, POST, OPTIONS"
                             )
                         )
                     }
@@ -315,6 +367,691 @@ class HttpServer(
 
                 activeConnections.decrementAndGet()
             }
+        }
+    }
+
+    private fun readRequestBody(
+        input: InputStream,
+        length: Int
+    ): ByteArray {
+
+        val body =
+            ByteArray(length)
+
+        var offset = 0
+
+        while (offset < length) {
+
+            val read =
+                input.read(
+                    body,
+                    offset,
+                    length - offset
+                )
+
+            if (read <= 0) {
+                break
+            }
+
+            offset += read
+        }
+
+        return if (offset == length) {
+            body
+        } else {
+            body.copyOf(offset)
+        }
+    }
+
+    private fun handlePostRequest(
+        target: String,
+        headers: Map<String, String>,
+        body: ByteArray,
+        output: OutputStream
+    ) {
+
+        val uri =
+            Uri.parse(target)
+
+        val path =
+            uri.path ?: "/"
+
+        when (path) {
+
+            "/api/send-payload" -> {
+
+                handleSendPayload(
+                    body = body,
+                    output = output
+                )
+            }
+
+            "/api/install" -> {
+
+                handleRemoteInstall(
+                    body = body,
+                    output = output
+                )
+            }
+
+            else -> {
+
+                sendError(
+                    output,
+                    404,
+                    "POST endpoint not found"
+                )
+            }
+        }
+    }
+
+    private fun handleSendPayload(
+        body: ByteArray,
+        output: OutputStream
+    ) {
+
+        try {
+
+            val json =
+                JSONObject(
+                    String(
+                        body,
+                        StandardCharsets.UTF_8
+                    )
+                )
+
+            val ip =
+                json.optString("ip")
+                    .trim()
+
+            val payloadName =
+                json.optString("payloadName")
+                    .trim()
+
+            if (!isValidIp(ip)) {
+
+                sendJsonError(
+                    output,
+                    400,
+                    "IP do PS4 inválido."
+                )
+
+                return
+            }
+
+            if (
+                !ALLOWED_PAYLOADS.contains(
+                    payloadName
+                )
+            ) {
+
+                sendJsonError(
+                    output,
+                    400,
+                    "Payload não autorizado."
+                )
+
+                return
+            }
+
+            val payload =
+                loadPayload(
+                    payloadName
+                )
+
+            if (payload == null) {
+
+                sendJsonError(
+                    output,
+                    404,
+                    "Payload não encontrado em assets/$PAYLOAD_DIR."
+                )
+
+                return
+            }
+
+            val result =
+                sendPayloadToBinLoader(
+                    ip = ip,
+                    payload = payload
+                )
+
+            if (result.success) {
+
+                sendJson(
+                    output,
+                    200,
+                    JSONObject()
+                        .put(
+                            "success",
+                            true
+                        )
+                        .put(
+                            "message",
+                            "Payload enviado para $ip:9090."
+                        )
+                        .put(
+                            "bytes",
+                            payload.size
+                        )
+                )
+
+            } else {
+
+                sendJson(
+                    output,
+                    500,
+                    JSONObject()
+                        .put(
+                            "success",
+                            false
+                        )
+                        .put(
+                            "error",
+                            result.error
+                        )
+                )
+            }
+
+        } catch (e: Exception) {
+
+            sendJsonError(
+                output,
+                400,
+                "JSON inválido: ${e.message}"
+            )
+        }
+    }
+
+    private data class PayloadResult(
+        val success: Boolean,
+        val error: String? = null
+    )
+
+    private fun sendPayloadToBinLoader(
+        ip: String,
+        payload: ByteArray
+    ): PayloadResult {
+
+        return try {
+
+            Socket().use { socket ->
+
+                socket.connect(
+                    java.net.InetSocketAddress(
+                        ip,
+                        9090
+                    ),
+                    5000
+                )
+
+                socket.soTimeout = 5000
+
+                val output =
+                    socket.getOutputStream()
+
+                output.write(payload)
+                output.flush()
+
+                try {
+                    socket.shutdownOutput()
+                } catch (_: Exception) {
+                }
+            }
+
+            PayloadResult(
+                success = true
+            )
+
+        } catch (e: Exception) {
+
+            PayloadResult(
+                success = false,
+                error =
+                    "Falha TCP para $ip:9090: ${e.message}"
+            )
+        }
+    }
+
+    private fun loadPayload(
+        payloadName: String
+    ): ByteArray? {
+
+        return try {
+
+            context.assets
+                .open(
+                    "$PAYLOAD_DIR/$payloadName"
+                )
+                .use { input ->
+
+                    val output =
+                        ByteArrayOutputStream()
+
+                    val buffer =
+                        ByteArray(BUFFER_SIZE)
+
+                    while (true) {
+
+                        val read =
+                            input.read(buffer)
+
+                        if (read <= 0) {
+                            break
+                        }
+
+                        output.write(
+                            buffer,
+                            0,
+                            read
+                        )
+                    }
+
+                    output.toByteArray()
+                }
+
+        } catch (_: Exception) {
+
+            null
+        }
+    }
+
+    private fun handleRemoteInstall(
+        body: ByteArray,
+        output: OutputStream
+    ) {
+
+        try {
+
+            val json =
+                JSONObject(
+                    String(
+                        body,
+                        StandardCharsets.UTF_8
+                    )
+                )
+
+            val ip =
+                json.optString("ip")
+                    .trim()
+
+            val pkgUrl =
+                json.optString("pkgUrl")
+                    .trim()
+
+            if (!isValidIp(ip)) {
+
+                sendJsonError(
+                    output,
+                    400,
+                    "IP do PS4 inválido."
+                )
+
+                return
+            }
+
+            if (pkgUrl.isBlank()) {
+
+                sendJsonError(
+                    output,
+                    400,
+                    "URL do PKG ausente."
+                )
+
+                return
+            }
+
+            val result =
+                sendInstallRequestToPs4(
+                    ip = ip,
+                    pkgUrl = pkgUrl
+                )
+
+            if (result.success) {
+
+                sendJson(
+                    output,
+                    200,
+                    JSONObject()
+                        .put(
+                            "success",
+                            true
+                        )
+                        .put(
+                            "message",
+                            "PS4 aceitou a solicitação de instalação."
+                        )
+                        .put(
+                            "response",
+                            result.response
+                        )
+                )
+
+            } else {
+
+                sendJson(
+                    output,
+                    502,
+                    JSONObject()
+                        .put(
+                            "success",
+                            false
+                        )
+                        .put(
+                            "error",
+                            result.error
+                        )
+                )
+            }
+
+        } catch (e: Exception) {
+
+            sendJsonError(
+                output,
+                400,
+                "JSON inválido: ${e.message}"
+            )
+        }
+    }
+
+    private data class InstallResult(
+        val success: Boolean,
+        val response: String = "",
+        val error: String? = null
+    )
+
+    private fun sendInstallRequestToPs4(
+        ip: String,
+        pkgUrl: String
+    ): InstallResult {
+
+        return try {
+
+            Socket().use { socket ->
+
+                socket.connect(
+                    java.net.InetSocketAddress(
+                        ip,
+                        12800
+                    ),
+                    5000
+                )
+
+                socket.soTimeout = 5000
+
+                val body =
+                    JSONObject()
+                        .put(
+                            "type",
+                            "direct"
+                        )
+                        .put(
+                            "packages",
+                            JSONArray()
+                                .put(pkgUrl)
+                        )
+                        .toString()
+
+                val request =
+                    buildString {
+
+                        append(
+                            "POST /api/install HTTP/1.1\r\n"
+                        )
+
+                        append(
+                            "Host: $ip:12800\r\n"
+                        )
+
+                        append(
+                            "Content-Type: application/json\r\n"
+                        )
+
+                        append(
+                            "Content-Length: "
+                        )
+
+                        append(
+                            body.toByteArray(
+                                StandardCharsets.UTF_8
+                            ).size
+                        )
+
+                        append(
+                            "\r\n"
+                        )
+
+                        append(
+                            "Connection: close\r\n"
+                        )
+
+                        append(
+                            "\r\n"
+                        )
+
+                        append(body)
+                    }
+
+                val output =
+                    socket.getOutputStream()
+
+                output.write(
+                    request.toByteArray(
+                        StandardCharsets.UTF_8
+                    )
+                )
+
+                output.flush()
+
+                val response =
+                    readHttpResponse(
+                        socket.getInputStream()
+                    )
+
+                val status =
+                    response.first
+
+                val responseBody =
+                    response.second
+
+                if (
+                    status in 200..299
+                ) {
+
+                    InstallResult(
+                        success = true,
+                        response =
+                            responseBody
+                    )
+
+                } else {
+
+                    InstallResult(
+                        success = false,
+                        response =
+                            responseBody,
+                        error =
+                            "PS4 respondeu HTTP $status"
+                    )
+                }
+            }
+
+        } catch (e: Exception) {
+
+            InstallResult(
+                success = false,
+                error =
+                    "Falha ao comunicar com $ip:12800: ${e.message}"
+            )
+        }
+    }
+
+    private fun readHttpResponse(
+        input: InputStream
+    ): Pair<Int, String> {
+
+        val headerBuffer =
+            ByteArrayOutputStream()
+
+        val marker =
+            byteArrayOf(
+                '\r'.code.toByte(),
+                '\n'.code.toByte(),
+                '\r'.code.toByte(),
+                '\n'.code.toByte()
+            )
+
+        var matched = 0
+
+        while (
+            headerBuffer.size() <
+            MAX_HEADER_SIZE
+        ) {
+
+            val value =
+                input.read()
+
+            if (value == -1) {
+                break
+            }
+
+            headerBuffer.write(value)
+
+            if (
+                value.toByte() ==
+                marker[matched]
+            ) {
+
+                matched++
+
+                if (matched == 4) {
+                    break
+                }
+
+            } else {
+
+                matched =
+                    if (
+                        value.toByte() ==
+                        marker[0]
+                    ) {
+                        1
+                    } else {
+                        0
+                    }
+            }
+        }
+
+        val headersText =
+            String(
+                headerBuffer.toByteArray(),
+                StandardCharsets.ISO_8859_1
+            )
+
+        val firstLine =
+            headersText
+                .lineSequence()
+                .firstOrNull()
+                ?: ""
+
+        val status =
+            firstLine
+                .split(" ")
+                .getOrNull(1)
+                ?.toIntOrNull()
+                ?: 0
+
+        val contentLength =
+            headersText
+                .lineSequence()
+                .firstOrNull {
+                    it.startsWith(
+                        "Content-Length:",
+                        ignoreCase = true
+                    )
+                }
+                ?.substringAfter(":")
+                ?.trim()
+                ?.toIntOrNull()
+                ?: 0
+
+        val body =
+            if (
+                contentLength > 0 &&
+                contentLength <= MAX_POST_SIZE
+            ) {
+
+                val bytes =
+                    ByteArray(
+                        contentLength
+                    )
+
+                var offset = 0
+
+                while (
+                    offset <
+                    contentLength
+                ) {
+
+                    val read =
+                        input.read(
+                            bytes,
+                            offset,
+                            contentLength - offset
+                        )
+
+                    if (read <= 0) {
+                        break
+                    }
+
+                    offset += read
+                }
+
+                String(
+                    bytes,
+                    0,
+                    offset,
+                    StandardCharsets.UTF_8
+                )
+
+            } else {
+                ""
+            }
+
+        return Pair(
+            status,
+            body
+        )
+    }
+
+    private fun isValidIp(
+        ip: String
+    ): Boolean {
+
+        if (ip.isBlank()) {
+            return false
+        }
+
+        val parts =
+            ip.split(".")
+
+        if (parts.size != 4) {
+            return false
+        }
+
+        return try {
+
+            parts.all {
+
+                val value =
+                    it.toInt()
+
+                value in 0..255
+            }
+
+        } catch (_: Exception) {
+
+            false
         }
     }
 
@@ -492,17 +1229,6 @@ class HttpServer(
         val totalSize =
             packageInfo.size
 
-        if (totalSize < 0) {
-
-            sendError(
-                output,
-                500,
-                "Invalid package size"
-            )
-
-            return
-        }
-
         var start = 0L
 
         var end =
@@ -647,8 +1373,7 @@ class HttpServer(
                         }
 
                         if (end >= totalSize) {
-                            end =
-                                totalSize - 1
+                            end = totalSize - 1
                         }
                     }
                 }
@@ -816,7 +1541,6 @@ class HttpServer(
             if (skipped > 0) {
 
                 remaining -= skipped
-
                 continue
             }
 
@@ -889,14 +1613,12 @@ class HttpServer(
 
         return files
             .filter {
-
                 it.isFile &&
                     it.name
                         ?.lowercase()
                         ?.endsWith(".pkg") == true
             }
             .sortedBy {
-
                 it.name?.lowercase() ?: ""
             }
             .mapIndexed { index, file ->
@@ -1099,7 +1821,6 @@ class HttpServer(
         val html =
             """
 <!DOCTYPE html>
-
 <html lang="pt-BR">
 
 <head>
@@ -1124,10 +1845,7 @@ body {
     padding: 25px;
     background: #101114;
     color: #fff;
-    font-family:
-        Arial,
-        Helvetica,
-        sans-serif;
+    font-family: Arial, Helvetica, sans-serif;
 }
 
 .container {
@@ -1137,7 +1855,6 @@ body {
 
 h1 {
     margin-top: 0;
-    color: #fff;
 }
 
 h2 {
@@ -1198,7 +1915,8 @@ button:disabled {
     background: #333840;
 }
 
-.status {
+.status,
+.pkg-info {
     background: #111317;
     border-radius: 8px;
     padding: 15px;
@@ -1216,18 +1934,9 @@ button:disabled {
     font-weight: bold;
 }
 
-.pkg-info {
-    background: #111317;
-    border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 15px;
-    line-height: 1.7;
-    word-break: break-word;
-}
-
 #log {
-    min-height: 180px;
-    max-height: 350px;
+    min-height: 220px;
+    max-height: 400px;
     overflow-y: auto;
     white-space: pre-wrap;
     word-break: break-word;
@@ -1276,14 +1985,11 @@ button:disabled {
 PS4 Remote PKG Installer
 </div>
 
-
 <div class="panel">
 
 <div class="status">
 
-<strong>
-Servidor GTSTORE:
-</strong>
+<strong>Servidor GTSTORE:</strong>
 
 <span
     id="serverStatus"
@@ -1294,9 +2000,7 @@ ${if (status.running) " ONLINE" else " OFFLINE"}
 
 <br>
 
-<strong>
-URL:
-</strong>
+<strong>URL:</strong>
 
 <span id="serverUrl">
 ${escapeHtml(status.url)}
@@ -1304,19 +2008,13 @@ ${escapeHtml(status.url)}
 
 <br>
 
-<strong>
-Porta:
-</strong>
+<strong>Porta:</strong>
 
-<span>
-${status.port}
-</span>
+<span>${status.port}</span>
 
 <br>
 
-<strong>
-Conexões:
-</strong>
+<strong>Conexões:</strong>
 
 <span id="connections">
 ${status.activeConnections}
@@ -1325,7 +2023,6 @@ ${status.activeConnections}
 </div>
 
 </div>
-
 
 <div class="panel">
 
@@ -1345,11 +2042,10 @@ IP do PS4
     class="secondary"
     onclick="testarPS4()"
 >
-Testar PS4
+Testar comunicação
 </button>
 
 </div>
-
 
 <div class="panel">
 
@@ -1370,14 +2066,12 @@ Carregando PKGs...
 
 </select>
 
-
 <div
     id="pkgInfo"
     class="pkg-info"
 >
 Nenhum PKG selecionado.
 </div>
-
 
 <button
     id="installButton"
@@ -1388,7 +2082,6 @@ Enviar jogo para o PS4
 </button>
 
 </div>
-
 
 <div class="panel">
 
@@ -1401,43 +2094,47 @@ Enviar jogo para o PS4
 
 </div>
 
-
 <div class="panel">
 
 <div class="small">
 
-Fluxo experimental:
-
-<br>
-
-1. POST HTTP para porta 12800.
-
-<br>
-
-2. Se falhar, tentativa WebSocket na porta 9090.
-
-<br>
-
-3. Após 9090, nova tentativa em 12800.
+Fluxo GTSTORE:
 
 <br><br>
 
-A comunicação com a porta 9090 depende do serviço realmente
-estar aceitando WebSocket e o protocolo utilizado.
+1. Browser → Android :8080
+
+<br>
+
+2. Android → TCP RAW → PS4 :9090
+
+<br>
+
+3. BinLoader recebe o payload
+
+<br>
+
+4. Android → PS4 :12800
+
+<br>
+
+5. PS4 registra a URL do PKG
+
+<br>
+
+6. PS4 baixa o PKG diretamente do Android
 
 </div>
 
 </div>
 
 </div>
-
 
 <script>
 
 let packages = [];
 
 let selectedPackage = null;
-
 
 function log(message, type) {
 
@@ -1455,12 +2152,10 @@ function log(message, type) {
         logDiv.scrollHeight;
 }
 
-
 function getServerBaseUrl() {
 
     return window.location.origin;
 }
-
 
 async function carregarStatus() {
 
@@ -1516,7 +2211,6 @@ async function carregarStatus() {
     }
 }
 
-
 async function carregarPackages() {
 
     const select =
@@ -1535,10 +2229,8 @@ async function carregarPackages() {
             );
 
         if (!response.ok) {
-
             throw new Error(
-                "HTTP " +
-                response.status
+                "HTTP " + response.status
             );
         }
 
@@ -1635,7 +2327,6 @@ async function carregarPackages() {
     }
 }
 
-
 function mostrarPkg() {
 
     const select =
@@ -1692,20 +2383,12 @@ function mostrarPkg() {
 
         "<br>" +
 
-        "<strong>Tipo:</strong> " +
-        escapeHtml(
-            selectedPackage.type
-        ) +
-
-        "<br><br>" +
-
         "<strong>URL:</strong><br>" +
 
         escapeHtml(url);
 
     button.disabled = false;
 }
-
 
 async function testarPS4() {
 
@@ -1725,31 +2408,14 @@ async function testarPS4() {
     }
 
     log(
-        "Testando porta 12800...",
-        "info"
+        "Testando comunicação com o PS4..."
     );
-
-    const endpoint =
-        "http://" +
-        ip +
-        ":12800/api/is_exists";
 
     try {
 
-        const controller =
-            new AbortController();
-
-        const timeout =
-            setTimeout(
-                function() {
-                    controller.abort();
-                },
-                3000
-            );
-
         const response =
             await fetch(
-                endpoint,
+                "/api/send-payload",
                 {
                     method: "POST",
 
@@ -1760,48 +2426,207 @@ async function testarPS4() {
 
                     body:
                         JSON.stringify({
-                            title_id:
-                                "CUSA00000"
-                        }),
-
-                    signal:
-                        controller.signal
+                            ip: ip,
+                            payloadName:
+                                "rpi_installer.bin"
+                        })
                 }
             );
 
-        clearTimeout(timeout);
+        const data =
+            await response.json();
 
-        const text =
-            await response.text();
+        if (data.success) {
 
-        log(
-            "12800 respondeu HTTP " +
-            response.status +
-            "\\n\\n" +
-            text,
-            response.ok
-                ? "success"
-                : "warning"
-        );
+            log(
+                "TCP RAW 9090: conexão e envio realizados.",
+                "success"
+            );
+
+            log(
+                "Bytes enviados: " +
+                data.bytes,
+                "success"
+            );
+
+        } else {
+
+            log(
+                "Falha 9090: " +
+                data.error,
+                "error"
+            );
+        }
 
     } catch (error) {
 
         log(
-            "12800 inacessível.\\n" +
+            "Erro ao testar 9090: " +
             error.message,
             "error"
-        );
-
-        log(
-            "Isso não significa necessariamente que o PS4 esteja offline."
-        );
-
-        log(
-            "A próxima etapa será a porta 9090."
         );
     }
 }
 
+async function enviarPayload(ip) {
+
+    log(
+        "FASE 1: Android → TCP RAW → PS4:9090",
+        "info"
+    );
+
+    log(
+        "Payload: rpi_installer.bin"
+    );
+
+    try {
+
+        const response =
+            await fetch(
+                "/api/send-payload",
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body:
+                        JSON.stringify({
+                            ip: ip,
+                            payloadName:
+                                "rpi_installer.bin"
+                        })
+                }
+            );
+
+        const data =
+            await response.json();
+
+        if (!response.ok ||
+            !data.success
+        ) {
+
+            log(
+                "Falha na Fase 1: " +
+                (
+                    data.error ||
+                    "erro desconhecido"
+                ),
+                "error"
+            );
+
+            return false;
+        }
+
+        log(
+            "TCP RAW 9090 concluído.",
+            "success"
+        );
+
+        log(
+            "Bytes enviados: " +
+            data.bytes,
+            "success"
+        );
+
+        return true;
+
+    } catch (error) {
+
+        log(
+            "Erro na Fase 1: " +
+            error.message,
+            "error"
+        );
+
+        return false;
+    }
+}
+
+async function registrarPkg(ip, pkgUrl) {
+
+    log(
+        "FASE 2: Android → PS4:12800",
+        "info"
+    );
+
+    log(
+        "URL enviada ao PS4:"
+    );
+
+    log(
+        pkgUrl
+    );
+
+    try {
+
+        const response =
+            await fetch(
+                "/api/install",
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body:
+                        JSON.stringify({
+                            ip: ip,
+                            pkgUrl: pkgUrl
+                        })
+                }
+            );
+
+        const data =
+            await response.json();
+
+        if (!response.ok ||
+            !data.success
+        ) {
+
+            log(
+                "Falha na Fase 2: " +
+                (
+                    data.error ||
+                    "erro desconhecido"
+                ),
+                "error"
+            );
+
+            return false;
+        }
+
+        log(
+            "PS4 recebeu a solicitação de instalação.",
+            "success"
+        );
+
+        if (data.response) {
+
+            log(
+                "Resposta: " +
+                data.response,
+                "success"
+            );
+        }
+
+        return true;
+
+    } catch (error) {
+
+        log(
+            "Erro na Fase 2: " +
+            error.message,
+            "error"
+        );
+
+        return false;
+    }
+}
 
 async function iniciarInstalacao() {
 
@@ -1862,21 +2687,14 @@ async function iniciarInstalacao() {
         pkgUrl
     );
 
-    log(
-        "ETAPA 1: POST HTTP 12800..."
-    );
+    const payloadOk =
+        await enviarPayload(ip);
 
-    const sucesso =
-        await tentarApiRest(
-            ip,
-            pkgUrl
-        );
-
-    if (sucesso) {
+    if (!payloadOk) {
 
         log(
-            "Instalação aceita pela API 12800.",
-            "success"
+            "Instalação interrompida: Fase 1 falhou.",
+            "error"
         );
 
         button.disabled = false;
@@ -1884,365 +2702,75 @@ async function iniciarInstalacao() {
         return;
     }
 
+    /*
+     * Pequeno intervalo para permitir que
+     * o payload termine sua inicialização.
+     */
     log(
-        "12800 não respondeu ou recusou.",
-        "warning"
+        "Aguardando inicialização do payload..."
     );
 
-    log(
-        "ETAPA 2: tentando porta 9090..."
+    await new Promise(
+        function(resolve) {
+            setTimeout(
+                resolve,
+                1000
+            );
+        }
     );
 
-    const ativado =
-        await ativarEEnviarPorSocket(
+    const pkgOk =
+        await registrarPkg(
             ip,
             pkgUrl
         );
 
-    if (!ativado) {
+    if (pkgOk) {
 
         log(
-            "9090 também não completou a operação.",
-            "error"
+            "--------------------------------"
         );
 
+        log(
+            "PROCESSO CONCLUÍDO.",
+            "success"
+        );
+
+    } else {
+
+        log(
+            "Fase 1 concluída, mas Fase 2 falhou.",
+            "warning"
+        );
     }
 
     button.disabled = false;
 }
 
-
-async function tentarApiRest(
-    ip,
-    pkgUrl
-) {
-
-    try {
-
-        const controller =
-            new AbortController();
-
-        const timeoutId =
-            setTimeout(
-                function() {
-                    controller.abort();
-                },
-                3000
-            );
-
-        const endpoint =
-            "http://" +
-            ip +
-            ":12800/api/install";
-
-        log(
-            "POST: " +
-            endpoint
-        );
-
-        const response =
-            await fetch(
-                endpoint,
-                {
-                    method: "POST",
-
-                    headers: {
-                        "Content-Type":
-                            "application/json"
-                    },
-
-                    body:
-                        JSON.stringify({
-                            type: "direct",
-
-                            packages: [
-                                pkgUrl
-                            ]
-                        }),
-
-                    signal:
-                        controller.signal
-                }
-            );
-
-        clearTimeout(timeoutId);
-
-        const text =
-            await response.text();
-
-        if (response.ok) {
-
-            log(
-                "HTTP " +
-                response.status,
-                "success"
-            );
-
-            log(
-                "Resposta: " +
-                text,
-                "success"
-            );
-
-            return true;
-        }
-
-        log(
-            "12800 respondeu HTTP " +
-            response.status,
-            "warning"
-        );
-
-        log(
-            text
-        );
-
-        return false;
-
-    } catch (error) {
-
-        log(
-            "Erro 12800: " +
-            error.message,
-            "warning"
-        );
-
-        return false;
-    }
-}
-
-
-function ativarEEnviarPorSocket(
-    ip,
-    pkgUrl
-) {
-
-    return new Promise(
-        function(resolve) {
-
-            let finalizado = false;
-
-            function terminar(resultado) {
-
-                if (finalizado) {
-                    return;
-                }
-
-                finalizado = true;
-
-                resolve(resultado);
-            }
-
-            try {
-
-                log(
-                    "Abrindo WebSocket ws://" +
-                    ip +
-                    ":9090..."
-                );
-
-                const ws =
-                    new WebSocket(
-                        "ws://" +
-                        ip +
-                        ":9090"
-                    );
-
-                ws.binaryType =
-                    "arraybuffer";
-
-                ws.onopen =
-                    function() {
-
-                        log(
-                            "Conexão WebSocket 9090 aberta.",
-                            "success"
-                        );
-
-                        log(
-                            "Enviando payload experimental..."
-                        );
-
-                        const payload =
-                            new Uint8Array([
-                                0x00,
-                                0x00,
-                                0x00,
-                                0x01,
-                                0x02,
-                                0x03,
-                                0x04
-                            ]);
-
-                        try {
-
-                            ws.send(
-                                payload.buffer
-                            );
-
-                            log(
-                                "Payload enviado."
-                            );
-
-                        } catch (error) {
-
-                            log(
-                                "Erro ao enviar payload: " +
-                                error.message,
-                                "error"
-                            );
-
-                            try {
-                                ws.close();
-                            } catch (_) {
-                            }
-
-                            terminar(false);
-
-                            return;
-                        }
-
-                        setTimeout(
-                            async function() {
-
-                                try {
-                                    ws.close();
-                                } catch (_) {
-                                }
-
-                                log(
-                                    "9090 finalizado."
-                                );
-
-                                log(
-                                    "Tentando novamente 12800..."
-                                );
-
-                                const sucesso =
-                                    await tentarApiRest(
-                                        ip,
-                                        pkgUrl
-                                    );
-
-                                if (sucesso) {
-
-                                    log(
-                                        "Instalação aceita após 9090.",
-                                        "success"
-                                    );
-
-                                    terminar(true);
-
-                                } else {
-
-                                    log(
-                                        "Não foi possível registrar a URL após 9090.",
-                                        "error"
-                                    );
-
-                                    terminar(false);
-                                }
-
-                            },
-                            1500
-                        );
-                    };
-
-                ws.onmessage =
-                    function(event) {
-
-                        log(
-                            "Mensagem recebida da 9090."
-                        );
-
-                        if (
-                            typeof event.data ===
-                            "string"
-                        ) {
-
-                            log(
-                                event.data
-                            );
-
-                        } else {
-
-                            log(
-                                "Resposta binária recebida."
-                            );
-                        }
-                    };
-
-                ws.onerror =
-                    function() {
-
-                        log(
-                            "Falha ao abrir WebSocket na porta 9090.",
-                            "error"
-                        );
-
-                        log(
-                            "A porta pode aceitar TCP/HTTP POST, mas não WebSocket."
-                        );
-
-                        terminar(false);
-                    };
-
-                ws.onclose =
-                    function() {
-
-                        if (!finalizado) {
-
-                            log(
-                                "Conexão 9090 fechada."
-                            );
-                        }
-                    };
-
-            } catch (error) {
-
-                log(
-                    "Erro 9090: " +
-                    error.message,
-                    "error"
-                );
-
-                terminar(false);
-            }
-        }
-    );
-}
-
-
 function escapeHtml(text) {
 
     return String(text)
-
         .replace(
             /&/g,
             "&amp;"
         )
-
         .replace(
             /</g,
             "&lt;"
         )
-
         .replace(
             />/g,
             "&gt;"
         )
-
         .replace(
             /"/g,
             "&quot;"
         )
-
         .replace(
             /'/g,
             "&#039;"
         );
 }
-
 
 window.addEventListener(
     "load",
@@ -2283,7 +2811,7 @@ window.addEventListener(
                 "Cache-Control" to "no-cache",
                 "Access-Control-Allow-Origin" to "*",
                 "Access-Control-Allow-Methods" to
-                    "GET, HEAD, OPTIONS",
+                    "GET, HEAD, POST, OPTIONS",
                 "Access-Control-Allow-Headers" to
                     "Content-Type"
             )
@@ -2301,7 +2829,7 @@ window.addEventListener(
             headers = mapOf(
                 "Access-Control-Allow-Origin" to "*",
                 "Access-Control-Allow-Methods" to
-                    "GET, HEAD, OPTIONS",
+                    "GET, HEAD, POST, OPTIONS",
                 "Access-Control-Allow-Headers" to
                     "Content-Type",
                 "Content-Length" to "0"
@@ -2309,6 +2837,60 @@ window.addEventListener(
         )
 
         output.flush()
+    }
+
+    private fun sendJson(
+        output: OutputStream,
+        statusCode: Int,
+        json: JSONObject
+    ) {
+
+        val body =
+            json.toString()
+                .toByteArray(
+                    StandardCharsets.UTF_8
+                )
+
+        sendResponse(
+            output = output,
+            statusCode = statusCode,
+            statusText =
+                if (statusCode in 200..299) {
+                    "OK"
+                } else {
+                    "Error"
+                },
+            contentType =
+                "application/json; charset=utf-8",
+            body = body,
+            headOnly = false,
+            extraHeaders = mapOf(
+                "Cache-Control" to "no-cache",
+                "Access-Control-Allow-Origin" to "*"
+            )
+        )
+    }
+
+    private fun sendJsonError(
+        output: OutputStream,
+        statusCode: Int,
+        message: String
+    ) {
+
+        sendJson(
+            output = output,
+            statusCode = statusCode,
+            json =
+                JSONObject()
+                    .put(
+                        "success",
+                        false
+                    )
+                    .put(
+                        "error",
+                        message
+                    )
+        )
     }
 
     private fun sendResponse(
@@ -2346,7 +2928,6 @@ window.addEventListener(
         )
 
         if (!headOnly) {
-
             output.write(body)
         }
 
@@ -2367,21 +2948,13 @@ window.addEventListener(
             "HTTP/1.1 "
         )
 
-        builder.append(
-            statusCode
-        )
+        builder.append(statusCode)
 
-        builder.append(
-            " "
-        )
+        builder.append(" ")
 
-        builder.append(
-            statusText
-        )
+        builder.append(statusText)
 
-        builder.append(
-            "\r\n"
-        )
+        builder.append("\r\n")
 
         builder.append(
             "Server: GTSTORE\r\n"
@@ -2393,26 +2966,13 @@ window.addEventListener(
 
         for (entry in headers) {
 
-            builder.append(
-                entry.key
-            )
-
-            builder.append(
-                ": "
-            )
-
-            builder.append(
-                entry.value
-            )
-
-            builder.append(
-                "\r\n"
-            )
+            builder.append(entry.key)
+            builder.append(": ")
+            builder.append(entry.value)
+            builder.append("\r\n")
         }
 
-        builder.append(
-            "\r\n"
-        )
+        builder.append("\r\n")
 
         output.write(
             builder.toString()
@@ -2563,7 +3123,6 @@ window.addEventListener(
         ) {
 
             value /= 1024
-
             index++
         }
 
