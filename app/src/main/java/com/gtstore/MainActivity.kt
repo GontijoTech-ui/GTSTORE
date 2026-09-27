@@ -35,7 +35,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
-import com.gtstore.ui.theme.GTStoreTheme
 import kotlinx.coroutines.delay
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
@@ -113,7 +112,7 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            GTStoreTheme {
+            MaterialTheme {
                 GTStoreApp(
                     selectedFolderUri = selectedFolderUri,
                     onSelectFolder = { folderPicker.launch(null) },
