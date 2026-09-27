@@ -15,22 +15,18 @@
         .online { color: #4caf50; font-weight: bold; }
         .offline { color: #f44336; font-weight: bold; }
         
-        /* Grid da Loja */
         .store-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .game-card { background: #1b1d22; border-radius: 10px; padding: 20px; border: 1px solid #333840; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s; }
-        .game-card:hover { transform: scale(1.02); border-color: #0070d1; }
         .game-title { font-size: 18px; font-weight: bold; margin-bottom: 10px; word-wrap: break-word; }
         .game-size { color: #aaa; font-size: 14px; margin-bottom: 15px; }
         
         button { width: 100%; padding: 16px; border: 0; border-radius: 8px; background: #0070d1; color: white; font-size: 16px; font-weight: bold; cursor: pointer; }
         button:disabled { background: #444; color: #999; cursor: not-allowed; }
-        button:focus { outline: 3px solid #fff; }
-
+        
         #log { min-height: 150px; max-height: 300px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; background: #08090b; border: 1px solid #333; border-radius: 8px; padding: 15px; font-family: monospace; font-size: 14px; color: #00ff66; margin-top: 20px;}
         
         .success { color: #00ff66; }
         .error { color: #ff5252; }
-        .warning { color: #ffca28; }
         .info { color: #61dafb; }
     </style>
 </head>
@@ -62,6 +58,14 @@
     </div>
 
     <script>
+        // Captura de erros globais (Impede falhas silenciosas na PS4)
+        window.onerror = function(msg, url, lineNo) {
+            var logDiv = document.getElementById("log");
+            logDiv.innerHTML += "<br><span class='error'>[CRASH JS] " + msg + " (Linha: " + lineNo + ")</span>";
+            logDiv.scrollTop = logDiv.scrollHeight;
+            return false;
+        };
+
         var ps4IpGlobal = "";
         var packagesList = [];
 
@@ -70,7 +74,6 @@
             var prefix = "> ";
             if(type === 'error') prefix = "[ERRO] ";
             if(type === 'success') prefix = "[OK] ";
-            
             var msgType = type ? type : 'info';
             logDiv.innerHTML += "<br><span class='" + msgType + "'>" + prefix + message + "</span>";
             logDiv.scrollTop = logDiv.scrollHeight;
@@ -80,9 +83,6 @@
             return window.location.origin; 
         }
 
-        /* 
-         * XHR Seguro para PS4 Antigo
-         */
         function apiCall(path, method, bodyObj, onSuccess, onError) {
             var xhr = new XMLHttpRequest();
             var url = getServerBaseUrl() + path + (method === "GET" ? "?t=" + new Date().getTime() : "");
@@ -104,11 +104,9 @@
                     if (onError) onError("Resposta inválida do servidor.");
                 }
             };
-            
             xhr.onerror = function() {
                 if (onError) onError("Falha de conexão com o Android.");
             };
-            
             xhr.send(bodyObj ? JSON.stringify(bodyObj) : null);
         }
 
@@ -139,20 +137,20 @@
                 grid.innerHTML = "";
                 
                 if (packagesList.length === 0) {
-                    grid.innerHTML = "<h3 style='color: #ffca28;'>Nenhum ficheiro .pkg encontrado.</h3>";
+                    grid.innerHTML = "<h3 style='color: #ffca28;'>Nenhum ficheiro .pkg encontrado na pasta selecionada.</h3>";
                     return;
                 }
                 
                 for(var i = 0; i < packagesList.length; i++) {
                     var pkg = packagesList[i];
-                    var pkgUrl = getServerBaseUrl() + pkg.url;
                     var card = document.createElement("div");
                     card.className = "game-card";
+                    // Agora passamos apenas o ID numérico para a função, evitando conflitos de aspas
                     card.innerHTML = "<div>" +
                                      "<div class='game-title'>" + escapeHtml(pkg.name) + "</div>" +
                                      "<div class='game-size'>Tamanho: " + escapeHtml(pkg.formattedSize) + "</div>" +
                                      "</div>" +
-                                     "<button id='btn-" + pkg.id + "' onclick='iniciarInstalacaoDireta(\"" + pkgUrl + "\", \"" + escapeHtml(pkg.name) + "\", \"btn-" + pkg.id + "\")'>Transferir para a PS4</button>";
+                                     "<button id='btn-" + pkg.id + "' onclick='iniciarInstalacaoDireta(" + pkg.id + ")'>Transferir para a PS4</button>";
                     grid.appendChild(card);
                 }
             }, function(err) {
@@ -160,11 +158,29 @@
             });
         }
 
-        function iniciarInstalacaoDireta(pkgUrl, pkgName, buttonId) {
+        function iniciarInstalacaoDireta(pkgId) {
             if (!ps4IpGlobal) { 
                 alert("Ainda a identificar o IP da PS4. Aguarde uns segundos."); 
                 return; 
             }
+
+            // Encontrar o pacote pelo ID
+            var pacoteSelecionado = null;
+            for(var i = 0; i < packagesList.length; i++) {
+                if(packagesList[i].id == pkgId) {
+                    pacoteSelecionado = packagesList[i];
+                    break;
+                }
+            }
+
+            if(!pacoteSelecionado) {
+                log("Erro interno: PKG não encontrado na lista.", "error");
+                return;
+            }
+
+            var pkgUrl = getServerBaseUrl() + pacoteSelecionado.url;
+            var pkgName = pacoteSelecionado.name;
+            var buttonId = "btn-" + pkgId;
             
             var btn = document.getElementById(buttonId);
             btn.disabled = true;
@@ -174,19 +190,16 @@
             log("Preparando instalação: " + pkgName, "info");
             log("Injetando RPI Payload na porta 9090...", "info");
             
-            // Passo 1: Enviar Payload
             apiCall("/api/send-payload", "POST", { ip: ps4IpGlobal, payloadName: "rpi_installer.bin" }, 
                 function(dataPayload) {
                     log("Payload ativado com sucesso!", "success");
                     
-                    // Passo 2: Aguardar 1.5s para o Payload fixar na memória do PS4
                     setTimeout(function() {
                         log("Enviando ordem de transferência para a porta 12800...", "info");
                         
-                        // Passo 3: Iniciar Transferência
                         apiCall("/api/install", "POST", { ip: ps4IpGlobal, pkgUrl: pkgUrl },
                             function(dataInstall) {
-                                log("A PS4 aceitou o jogo! Verifique as Notificações de Transferência.", "success");
+                                log("A PS4 aceitou o jogo! Verifique as Notificações da consola.", "success");
                                 btn.innerText = "A Transferir...";
                                 btn.style.background = "#4caf50";
                             },
@@ -211,11 +224,11 @@
             return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
         }
 
-        window.addEventListener("load", function() {
+        window.onload = function() {
             carregarStatus();
             carregarPackages();
             setInterval(carregarStatus, 3000);
-        });
+        };
     </script>
 </body>
 </html>
