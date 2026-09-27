@@ -35,12 +35,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
-import com.gtstore.ui.theme.GTStoreTheme
 import kotlinx.coroutines.delay
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+
+@Composable
+fun GTStoreTheme(content: @Composable () -> Unit) {
+    MaterialTheme(
+        colorScheme = androidx.compose.material3.darkColorScheme(),
+        content = content
+    )
+}
+
 
 enum class GTStoreScreen {
     DASHBOARD,
