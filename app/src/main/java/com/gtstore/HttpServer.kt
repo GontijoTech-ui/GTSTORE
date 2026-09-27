@@ -1,4 +1,4 @@
-package com.example.ps4rpi
+package com.gtstore
 
 import android.content.Context
 import android.net.Uri
@@ -8,12 +8,13 @@ import java.net.*
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 import org.json.JSONArray
 import org.json.JSONObject
 
 class HttpServer(
     private val context: Context,
-    private val port: Int = 8080
+    val port: Int = 8080
 ) {
     data class PkgItem(
         val id: String,
@@ -22,21 +23,41 @@ class HttpServer(
         val uri: Uri
     )
 
+    data class ServerStatus(
+        val running: Boolean,
+        val isRunning: Boolean,
+        val port: Int,
+        val localAddress: String?,
+        val activeConnections: Int
+    )
+
     @Volatile
-    private var isRunning = false
+    var isRunning: Boolean = false
+        private set
+
     private var serverSocket: ServerSocket? = null
-    
-    // Pool fixo para conter o consumo de memória com múltiplas conexões do PS4
     private val threadPool = Executors.newFixedThreadPool(12)
-    
-    // Cache em memória para os arquivos PKG para evitar varredura lenta do SAF
     private val pkgCache = ConcurrentHashMap<String, PkgItem>()
+    private val activeConnectionsCount = AtomicInteger(0)
+
+    val localAddress: String?
+        get() = getWifiIpv4Address()
+
+    fun getStatus(): ServerStatus {
+        val currentRunning = isRunning
+        return ServerStatus(
+            running = currentRunning,
+            isRunning = currentRunning,
+            port = port,
+            localAddress = localAddress,
+            activeConnections = activeConnectionsCount.get()
+        )
+    }
 
     fun start() {
         if (isRunning) return
         isRunning = true
 
-        // Indexa os arquivos PKG em background ao iniciar
         threadPool.execute { scanPkgs() }
 
         threadPool.execute {
@@ -62,9 +83,6 @@ class HttpServer(
         threadPool.shutdown()
     }
 
-    /**
-     * Varre a pasta SAF e armazena os metadados em cache em memória.
-     */
     fun scanPkgs() {
         val prefs = context.getSharedPreferences("ps4_rpi_prefs", Context.MODE_PRIVATE)
         val uriString = prefs.getString("pkg_folder_uri", null) ?: return
@@ -89,46 +107,51 @@ class HttpServer(
     }
 
     private fun handleClient(socket: Socket) {
-        socket.use { client ->
-            client.soTimeout = 15000 // Timeout de 15 segundos no socket
-            val input = BufferedReader(InputStreamReader(client.getInputStream(), Charsets.US_ASCII))
-            val output = client.getOutputStream()
+        activeConnectionsCount.incrementAndGet()
+        try {
+            socket.use { client ->
+                client.soTimeout = 15000
+                val input = BufferedReader(InputStreamReader(client.getInputStream(), Charsets.US_ASCII))
+                val output = client.getOutputStream()
 
-            val requestLine = input.readLine() ?: return
-            val parts = requestLine.split(" ")
-            if (parts.size < 2) return
+                val requestLine = input.readLine() ?: return
+                val parts = requestLine.split(" ")
+                if (parts.size < 2) return
 
-            val method = parts[0]
-            val path = parts[1]
+                val method = parts[0]
+                val path = parts[1]
 
-            val headers = mutableMapOf<String, String>()
-            var line: String?
-            while (input.readLine().also { line = it } != null && !line.isNullOrBlank()) {
-                val headerParts = line!!.split(":", limit = 2)
-                if (headerParts.size == 2) {
-                    headers[headerParts[0].trim().lowercase(Locale.US)] = headerParts[1].trim()
+                val headers = mutableMapOf<String, String>()
+                var line: String?
+                while (input.readLine().also { line = it } != null && !line.isNullOrBlank()) {
+                    val headerParts = line!!.split(":", limit = 2)
+                    if (headerParts.size == 2) {
+                        headers[headerParts[0].trim().lowercase(Locale.US)] = headerParts[1].trim()
+                    }
+                }
+
+                if (method.equals("OPTIONS", ignoreCase = true)) {
+                    sendCorsResponse(output)
+                    return
+                }
+
+                when {
+                    path == "/" || path == "/index.html" -> sendHomePage(output)
+                    path == "/api/pkgs" -> sendPkgListJson(output)
+                    path == "/api/scan" -> {
+                        scanPkgs()
+                        sendJsonResponse(output, 200, "{\"status\":\"ok\",\"count\":${pkgCache.size}}")
+                    }
+                    path.startsWith("/api/install") -> handleInstallRequest(input, headers, output)
+                    path.startsWith("/pkg/") -> {
+                        val pkgId = path.removePrefix("/pkg/").substringBefore("?")
+                        servePkgFile(pkgId, headers["range"], method, output)
+                    }
+                    else -> sendNotFound(output)
                 }
             }
-
-            if (method.equals("OPTIONS", ignoreCase = true)) {
-                sendCorsResponse(output)
-                return
-            }
-
-            when {
-                path == "/" || path == "/index.html" -> sendHomePage(output)
-                path == "/api/pkgs" -> sendPkgListJson(output)
-                path == "/api/scan" -> {
-                    scanPkgs()
-                    sendJsonResponse(output, 200, "{\"status\":\"ok\",\"count\":${pkgCache.size}}")
-                }
-                path.startsWith("/api/install") -> handleInstallRequest(input, headers, output)
-                path.startsWith("/pkg/") -> {
-                    val pkgId = path.removePrefix("/pkg/").substringBefore("?")
-                    servePkgFile(pkgId, headers["range"], method, output)
-                }
-                else -> sendNotFound(output)
-            }
+        } finally {
+            activeConnectionsCount.decrementAndGet()
         }
     }
 
@@ -163,7 +186,6 @@ class HttpServer(
         if (rangeEnd >= totalFileSize) rangeEnd = totalFileSize - 1
         if (rangeStart > rangeEnd) rangeStart = 0L
 
-        // Tamanho exato do chunk (CRÍTICO para o PS4)
         val contentLength = (rangeEnd - rangeStart) + 1
 
         val statusLine = if (isPartial) "HTTP/1.1 206 Partial Content\r\n" else "HTTP/1.1 200 OK\r\n"
@@ -201,7 +223,7 @@ class HttpServer(
                 output.flush()
             }
         } catch (e: IOException) {
-            // Cliente PS4 encerrou a conexão ou saltou de posição (comportamento normal em Range requests)
+            // Cliente desconectou durante o streaming
         }
     }
 
@@ -286,14 +308,14 @@ class HttpServer(
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>PS4 RPI Server</title>
+                <title>GTStore PS4 Server</title>
                 <style>
                     body { font-family: system-ui, sans-serif; background: #121212; color: #fff; padding: 20px; }
                     .card { background: #1e1e1e; padding: 15px; border-radius: 8px; margin-bottom: 10px; }
                 </style>
             </head>
             <body>
-                <h1>PS4 Package Server</h1>
+                <h1>GTStore PS4 Package Server</h1>
                 <p>Status: Servidor ativo</p>
                 <div id="pkgs">Carregando pacotes...</div>
                 <script>
@@ -307,8 +329,8 @@ class HttpServer(
                             }
                             container.innerHTML = data.map(p => `
                                 <div class="card">
-                                    <h3>${p.name}</h3>
-                                    <p>Tamanho: ${p.formatted_size}</p>
+                                    <h3>${'$'}{p.name}</h3>
+                                    <p>Tamanho: ${'$'}{p.formatted_size}</p>
                                 </div>
                             `).join('');
                         });
