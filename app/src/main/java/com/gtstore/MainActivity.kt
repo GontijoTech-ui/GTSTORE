@@ -1,5 +1,6 @@
 package com.gtstore
 
+import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -13,10 +14,8 @@ import android.os.Looper
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : Activity() {
 
     private var storeService: GTStoreService? = null
     private var isBound = false
@@ -28,6 +27,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnToggleServer: Button
     private lateinit var btnSelectFolder: Button
     private lateinit var btnRescanPkgs: Button
+
+    private val FOLDER_PICKER_REQUEST = 1002
 
     private val handler = Handler(Looper.getMainLooper())
     private val updateRunnable = object : Runnable {
@@ -49,31 +50,6 @@ class MainActivity : AppCompatActivity() {
             storeService = null
             isBound = false
             updateUiStatus()
-        }
-    }
-
-    private val folderPickerLauncher = registerForActivityResult(
-        ActivityResultContracts.OpenDocumentTree()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            // Persiste a permissão de acesso à pasta selecionada
-            contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-            )
-
-            val prefs = getSharedPreferences("ps4_rpi_prefs", Context.MODE_PRIVATE)
-            prefs.edit().putString("pkg_folder_uri", uri.toString()).apply()
-
-            tvSelectedFolder.text = "Pasta: ${uri.path}"
-            Toast.makeText(this, "Pasta configurada com sucesso!", Toast.LENGTH_SHORT).show()
-
-            // Atualiza o cache de ficheiros do servidor se estiver a rodar
-            storeService?.let { service ->
-                if (service.getStatus().running) {
-                    GTStoreService.startService(this)
-                }
-            }
         }
     }
 
@@ -115,7 +91,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupListeners() {
         btnSelectFolder.setOnClickListener {
-            folderPickerLauncher.launch(null)
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+            startActivityForResult(intent, FOLDER_PICKER_REQUEST)
         }
 
         btnToggleServer.setOnClickListener {
@@ -123,25 +100,50 @@ class MainActivity : AppCompatActivity() {
             val folderUri = prefs.getString("pkg_folder_uri", null)
 
             if (folderUri.isNullOrEmpty()) {
-                Toast.makeText(this, "Selecione primeiro uma pasta com ficheiros PKG!", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@MainActivity, "Selecione primeiro uma pasta com ficheiros PKG!", Toast.LENGTH_LONG).show()
                 return@setOnClickListener
             }
 
             val status = storeService?.getStatus()
             if (status?.running == true) {
-                GTStoreService.stopService(this)
+                GTStoreService.stopService(this@MainActivity)
             } else {
-                GTStoreService.startService(this)
+                GTStoreService.startService(this@MainActivity)
             }
             updateUiStatus()
         }
 
         btnRescanPkgs.setOnClickListener {
             if (storeService?.getStatus()?.running == true) {
-                Toast.makeText(this, "A reindexar ficheiros PKG...", Toast.LENGTH_SHORT).show()
-                GTStoreService.startService(this)
+                Toast.makeText(this@MainActivity, "A reindexar ficheiros PKG...", Toast.LENGTH_SHORT).show()
+                GTStoreService.startService(this@MainActivity)
             } else {
-                Toast.makeText(this, "Inicie o servidor para reindexar.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, "Inicie o servidor para reindexar.", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == FOLDER_PICKER_REQUEST && resultCode == RESULT_OK) {
+            val uri = data?.data
+            if (uri != null) {
+                contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+
+                val prefs = getSharedPreferences("ps4_rpi_prefs", Context.MODE_PRIVATE)
+                prefs.edit().putString("pkg_folder_uri", uri.toString()).apply()
+
+                tvSelectedFolder.text = "Pasta: ${uri.path}"
+                Toast.makeText(this, "Pasta configurada com sucesso!", Toast.LENGTH_SHORT).show()
+
+                storeService?.let { service ->
+                    if (service.getStatus().running) {
+                        GTStoreService.startService(this)
+                    }
+                }
             }
         }
     }
