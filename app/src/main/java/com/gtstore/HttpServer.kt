@@ -29,13 +29,12 @@ class HttpServer(
 ) {
 
     companion object {
-        private const val BUFFER_SIZE = 64 * 1024 // 64KB para leitura/escrita rápida
+        private const val BUFFER_SIZE = 64 * 1024
         private const val MAX_HEADER_SIZE = 64 * 1024
         private const val MAX_POST_SIZE = 1024 * 1024
-        private const val SOCKET_TIMEOUT_MS = 60_000 // 60 segundos para evitar cortes durante o BGFT
+        private const val SOCKET_TIMEOUT_MS = 60_000
         private const val PAYLOAD_DIR = "payloads"
 
-        // Lista de binários permitidos
         private val ALLOWED_PAYLOADS = setOf(
             "rpi_installer.bin",
             "direct-installer.bin",
@@ -125,10 +124,14 @@ class HttpServer(
 
     private fun handleClient(socket: Socket) {
         activeConnections.incrementAndGet()
+        
+        // CAPTURA O IP DA PS4 (OU DE QUEM ESTIVER A ACEDER AO BROWSER)
+        val clientIp = (socket.remoteSocketAddress as? InetSocketAddress)?.address?.hostAddress ?: ""
+        
         socket.use { client ->
             try {
                 client.soTimeout = SOCKET_TIMEOUT_MS
-                client.tcpNoDelay = true // Otimização: desativa o Nagle's algorithm
+                client.tcpNoDelay = true
 
                 val input = BufferedReader(
                     InputStreamReader(client.getInputStream(), StandardCharsets.ISO_8859_1)
@@ -175,14 +178,13 @@ class HttpServer(
                 }
 
                 when (method) {
-                    "GET" -> handleRequest(target, headers, output, headOnly = false)
-                    "HEAD" -> handleRequest(target, headers, output, headOnly = true)
+                    "GET" -> handleRequest(target, headers, output, headOnly = false, clientIp)
+                    "HEAD" -> handleRequest(target, headers, output, headOnly = true, clientIp)
                     "POST" -> handlePostRequest(target, body, output)
                     "OPTIONS" -> sendOptions(output)
                     else -> sendError(output, 405, "Method Not Allowed", mapOf("Allow" to "GET, HEAD, POST, OPTIONS"))
                 }
             } catch (_: SocketException) {
-                // Fecho de ligação normal ou reset pelo cliente
             } catch (_: Exception) {
                 try { sendError(client.getOutputStream(), 500, "Internal Server Error") } catch (_: Exception) {}
             } finally {
@@ -220,7 +222,7 @@ class HttpServer(
             val payloadName = json.optString("payloadName").trim()
 
             if (!isValidIp(ip)) {
-                sendJsonError(output, 400, "IP do PS4 inválido.")
+                sendJsonError(output, 400, "IP da PS4 inválido.")
                 return
             }
             if (!ALLOWED_PAYLOADS.contains(payloadName)) {
@@ -290,7 +292,7 @@ class HttpServer(
             val pkgUrl = json.optString("pkgUrl").trim()
 
             if (!isValidIp(ip)) {
-                sendJsonError(output, 400, "IP do PS4 inválido.")
+                sendJsonError(output, 400, "IP da PS4 inválido.")
                 return
             }
             if (pkgUrl.isBlank()) {
@@ -300,7 +302,7 @@ class HttpServer(
 
             val result = sendInstallRequestToPs4(ip, pkgUrl)
             if (result.success) {
-                sendJson(output, 200, JSONObject().put("success", true).put("message", "PS4 aceitou a solicitação de instalação.").put("response", result.response))
+                sendJson(output, 200, JSONObject().put("success", true).put("message", "A PS4 aceitou a solicitação de instalação.").put("response", result.response))
             } else {
                 sendJson(output, 502, JSONObject().put("success", false).put("error", result.error))
             }
@@ -335,7 +337,7 @@ class HttpServer(
                 if (response.first in 200..299) {
                     InstallResult(success = true, response = response.second)
                 } else {
-                    InstallResult(success = false, response = response.second, error = "PS4 respondeu HTTP ${response.first}")
+                    InstallResult(success = false, response = response.second, error = "A PS4 respondeu HTTP ${response.first}")
                 }
             }
         } catch (e: Exception) {
@@ -393,13 +395,13 @@ class HttpServer(
         return try { parts.all { it.toInt() in 0..255 } } catch (_: Exception) { false }
     }
 
-    private fun handleRequest(target: String, headers: Map<String, String>, output: OutputStream, headOnly: Boolean) {
+    private fun handleRequest(target: String, headers: Map<String, String>, output: OutputStream, headOnly: Boolean, clientIp: String) {
         val uri = Uri.parse(target)
         val path = uri.path ?: "/"
 
         when {
             path == "/" || path == "/ps4" -> sendHomePage(output, headOnly)
-            path == "/api/status" -> sendStatusJson(output, headOnly)
+            path == "/api/status" -> sendStatusJson(output, headOnly, clientIp)
             path == "/api/packages" -> sendPackagesJson(output, headOnly)
             path == "/download" || path == "/pkg" -> {
                 val id = uri.getQueryParameter("id")?.toIntOrNull()
@@ -521,7 +523,6 @@ class HttpServer(
                 }
             }
         } catch (_: SocketException) {
-            // Cancelamento silencioso
         } catch (_: Exception) {}
 
         try { output.flush() } catch (_: Exception) {}
@@ -610,12 +611,14 @@ class HttpServer(
         sendResponse(output, 200, "OK", "application/json; charset=utf-8", body, headOnly, mapOf("Cache-Control" to "no-cache", "Access-Control-Allow-Origin" to "*"))
     }
 
-    private fun sendStatusJson(output: OutputStream, headOnly: Boolean) {
+    private fun sendStatusJson(output: OutputStream, headOnly: Boolean, clientIp: String) {
         val status = getStatus()
         val json = JSONObject()
             .put("online", status.running).put("running", status.running).put("port", status.port)
             .put("address", status.localAddress).put("localAddress", status.localAddress)
             .put("url", status.url).put("activeConnections", status.activeConnections)
+            .put("clientIp", clientIp) // O IP DE QUEM ACEDE É DEVOLVIDO AQUI
+            
         val body = json.toString().toByteArray(StandardCharsets.UTF_8)
         sendResponse(output, 200, "OK", "application/json; charset=utf-8", body, headOnly, mapOf("Cache-Control" to "no-cache", "Access-Control-Allow-Origin" to "*"))
     }
@@ -640,7 +643,7 @@ class HttpServer(
                 )
             }
         } catch (e: Exception) {
-            sendError(output, 404, "Arquivo index.html não encontrado na pasta assets.")
+            sendError(output, 404, "Ficheiro index.html não encontrado na pasta assets.")
         }
     }
 
