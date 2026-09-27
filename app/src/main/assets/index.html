@@ -62,14 +62,17 @@
     </div>
 
     <script>
-        let ps4IpGlobal = "";
+        var ps4IpGlobal = "";
+        var packagesList = [];
 
         function log(message, type) {
-            const logDiv = document.getElementById("log");
-            let prefix = "> ";
+            var logDiv = document.getElementById("log");
+            var prefix = "> ";
             if(type === 'error') prefix = "[ERRO] ";
             if(type === 'success') prefix = "[OK] ";
-            logDiv.innerHTML += `<br><span class="${type || 'info'}">${prefix}${message}</span>`;
+            
+            var msgType = type ? type : 'info';
+            logDiv.innerHTML += "<br><span class='" + msgType + "'>" + prefix + message + "</span>";
             logDiv.scrollTop = logDiv.scrollHeight;
         }
 
@@ -78,158 +81,130 @@
         }
 
         /* 
-         * SOLUÇÃO PARA A PS4: 
-         * Wrapper usando XMLHttpRequest, 100% compatível com o navegador WebKit antigo da PS4
+         * XHR Seguro para PS4 Antigo
          */
-        function apiCall(path, method = "GET", bodyObj = null) {
-            return new Promise(function(resolve, reject) {
-                const xhr = new XMLHttpRequest();
-                const url = getServerBaseUrl() + path + (method === "GET" ? "?t=" + new Date().getTime() : "");
-                
-                xhr.open(method, url, true);
-                
-                if (method === "POST") {
-                    xhr.setRequestHeader("Content-Type", "application/json");
-                }
-                
-                xhr.onload = function() {
-                    try {
-                        const data = JSON.parse(xhr.responseText);
-                        resolve({ ok: xhr.status >= 200 && xhr.status < 300, data: data });
-                    } catch (e) {
-                        reject(new Error("Resposta inválida do servidor."));
+        function apiCall(path, method, bodyObj, onSuccess, onError) {
+            var xhr = new XMLHttpRequest();
+            var url = getServerBaseUrl() + path + (method === "GET" ? "?t=" + new Date().getTime() : "");
+            
+            xhr.open(method, url, true);
+            if (method === "POST") {
+                xhr.setRequestHeader("Content-Type", "application/json");
+            }
+            
+            xhr.onload = function() {
+                try {
+                    var data = JSON.parse(xhr.responseText);
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        if (onSuccess) onSuccess(data);
+                    } else {
+                        if (onError) onError(data.error || "Erro " + xhr.status);
                     }
-                };
-                
-                xhr.onerror = function() {
-                    reject(new Error("A conexão ao telemóvel falhou ou foi bloqueada."));
-                };
-                
-                xhr.send(bodyObj ? JSON.stringify(bodyObj) : null);
-            });
+                } catch (e) {
+                    if (onError) onError("Resposta inválida do servidor.");
+                }
+            };
+            
+            xhr.onerror = function() {
+                if (onError) onError("Falha de conexão com o Android.");
+            };
+            
+            xhr.send(bodyObj ? JSON.stringify(bodyObj) : null);
         }
 
-        async function carregarStatus() {
-            try {
-                const res = await apiCall("/api/status");
-                const data = res.data;
-                
-                const statusEl = document.getElementById("serverStatus");
+        function carregarStatus() {
+            apiCall("/api/status", "GET", null, function(data) {
+                var statusEl = document.getElementById("serverStatus");
                 statusEl.innerText = data.online ? "ONLINE" : "OFFLINE";
                 statusEl.className = data.online ? "online" : "offline";
                 
                 if(data.clientIp) {
-                    let ip = data.clientIp;
-                    // Limpa o IP caso o Android devolva um formato IPv6 mapeado (ex: ::ffff:192.168.1.10)
+                    var ip = data.clientIp;
                     if(ip.indexOf("::ffff:") === 0) {
                         ip = ip.substring(7);
                     }
                     ps4IpGlobal = ip;
                     document.getElementById("ps4ipDisplay").innerText = ps4IpGlobal;
                 }
-            } catch (error) {
+            }, function(err) {
                 document.getElementById("serverStatus").innerText = "OFFLINE";
                 document.getElementById("serverStatus").className = "offline";
-            }
+            });
         }
 
-        async function carregarPackages() {
-            try {
-                const res = await apiCall("/api/packages");
-                const packages = res.data.packages || [];
-                const grid = document.getElementById("store-grid");
-                
+        function carregarPackages() {
+            apiCall("/api/packages", "GET", null, function(data) {
+                packagesList = data.packages || [];
+                var grid = document.getElementById("store-grid");
                 grid.innerHTML = "";
                 
-                if (packages.length === 0) {
-                    grid.innerHTML = "<h3 style='color: #ffca28;'>Nenhum ficheiro .pkg encontrado na pasta selecionada.</h3>";
+                if (packagesList.length === 0) {
+                    grid.innerHTML = "<h3 style='color: #ffca28;'>Nenhum ficheiro .pkg encontrado.</h3>";
                     return;
                 }
                 
-                packages.forEach(function(pkg) {
-                    const pkgUrl = getServerBaseUrl() + pkg.url;
-                    const card = document.createElement("div");
+                for(var i = 0; i < packagesList.length; i++) {
+                    var pkg = packagesList[i];
+                    var pkgUrl = getServerBaseUrl() + pkg.url;
+                    var card = document.createElement("div");
                     card.className = "game-card";
-                    card.innerHTML = `
-                        <div>
-                            <div class="game-title">${escapeHtml(pkg.name)}</div>
-                            <div class="game-size">Tamanho: ${escapeHtml(pkg.formattedSize)}</div>
-                        </div>
-                        <button id="btn-${pkg.id}" onclick="iniciarInstalacaoDireta('${pkgUrl}', '${escapeHtml(pkg.name)}', 'btn-${pkg.id}')">Transferir para a PS4</button>
-                    `;
+                    card.innerHTML = "<div>" +
+                                     "<div class='game-title'>" + escapeHtml(pkg.name) + "</div>" +
+                                     "<div class='game-size'>Tamanho: " + escapeHtml(pkg.formattedSize) + "</div>" +
+                                     "</div>" +
+                                     "<button id='btn-" + pkg.id + "' onclick='iniciarInstalacaoDireta(\"" + pkgUrl + "\", \"" + escapeHtml(pkg.name) + "\", \"btn-" + pkg.id + "\")'>Transferir para a PS4</button>";
                     grid.appendChild(card);
-                });
-                
-            } catch (error) {
-                document.getElementById("store-grid").innerHTML = "<h3 class='error'>Erro ao comunicar com o telemóvel.</h3>";
-            }
-        }
-
-        async function enviarPayload() {
-            log("Injetando RPI Payload na porta 9090...", "info");
-            try {
-                const res = await apiCall("/api/send-payload", "POST", { ip: ps4IpGlobal, payloadName: "rpi_installer.bin" });
-                if (!res.ok || !res.data.success) {
-                    log("Injeção falhou: " + (res.data.error || "Desconhecido"), "error");
-                    return false;
                 }
-                log("Payload ativado com sucesso!", "success");
-                return true;
-            } catch (error) {
-                log("Erro de rede na injeção: " + error.message, "error");
-                return false;
-            }
+            }, function(err) {
+                document.getElementById("store-grid").innerHTML = "<h3 class='error'>Erro ao comunicar com o telemóvel. O Servidor está iniciado?</h3>";
+            });
         }
 
-        async function registrarPkg(pkgUrl) {
-            log("Enviando ordem de transferência para a porta 12800...", "info");
-            try {
-                const res = await apiCall("/api/install", "POST", { ip: ps4IpGlobal, pkgUrl: pkgUrl });
-                if (!res.ok || !res.data.success) {
-                    log("Ordem recusada pela PS4: " + (res.data.error || "Desconhecido"), "error");
-                    return false;
-                }
-                log("A PS4 aceitou o jogo! Verifique as Notificações de Transferência no menu principal.", "success");
-                return true;
-            } catch (error) {
-                log("A PS4 não respondeu na porta 12800. O RPI está ativo?", "error");
-                return false;
-            }
-        }
-
-        async function iniciarInstalacaoDireta(pkgUrl, pkgName, buttonId) {
+        function iniciarInstalacaoDireta(pkgUrl, pkgName, buttonId) {
             if (!ps4IpGlobal) { 
-                alert("Ainda a identificar o IP da PS4. Aguarde uns segundos e verifique se aparece no topo."); 
+                alert("Ainda a identificar o IP da PS4. Aguarde uns segundos."); 
                 return; 
             }
             
-            const btn = document.getElementById(buttonId);
+            var btn = document.getElementById(buttonId);
             btn.disabled = true;
             btn.innerText = "A Iniciar...";
             
             log("--------------------------------", "info");
-            log(`Preparando instalação: ${pkgName}`, "info");
+            log("Preparando instalação: " + pkgName, "info");
+            log("Injetando RPI Payload na porta 9090...", "info");
             
-            const payloadOk = await enviarPayload();
-            if (!payloadOk) {
-                log("Processo abortado.", "error");
-                btn.disabled = false;
-                btn.innerText = "Tentar Novamente";
-                return;
-            }
-            
-            // Pausa de 1,5s para garantir que o payload BinLoader assenta a porta 12800
-            await new Promise(function(resolve) { setTimeout(resolve, 1500); });
-            
-            const pkgOk = await registrarPkg(pkgUrl);
-            
-            if (pkgOk) {
-                btn.innerText = "A Transferir...";
-                btn.style.background = "#4caf50";
-            } else {
-                btn.disabled = false;
-                btn.innerText = "Tentar Novamente";
-            }
+            // Passo 1: Enviar Payload
+            apiCall("/api/send-payload", "POST", { ip: ps4IpGlobal, payloadName: "rpi_installer.bin" }, 
+                function(dataPayload) {
+                    log("Payload ativado com sucesso!", "success");
+                    
+                    // Passo 2: Aguardar 1.5s para o Payload fixar na memória do PS4
+                    setTimeout(function() {
+                        log("Enviando ordem de transferência para a porta 12800...", "info");
+                        
+                        // Passo 3: Iniciar Transferência
+                        apiCall("/api/install", "POST", { ip: ps4IpGlobal, pkgUrl: pkgUrl },
+                            function(dataInstall) {
+                                log("A PS4 aceitou o jogo! Verifique as Notificações de Transferência.", "success");
+                                btn.innerText = "A Transferir...";
+                                btn.style.background = "#4caf50";
+                            },
+                            function(errInstall) {
+                                log("A PS4 não respondeu na porta 12800. O RPI está ativo?", "error");
+                                btn.disabled = false;
+                                btn.innerText = "Tentar Novamente";
+                            }
+                        );
+                        
+                    }, 1500);
+                },
+                function(errPayload) {
+                    log("Injeção falhou: " + errPayload, "error");
+                    btn.disabled = false;
+                    btn.innerText = "Tentar Novamente";
+                }
+            );
         }
 
         function escapeHtml(text) {
