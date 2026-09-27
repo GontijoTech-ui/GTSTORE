@@ -5,10 +5,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 enum class PackageChangeType {
-    ADDED,
-    REMOVED,
-    CHANGED,
-    UNCHANGED
+    ADDED, REMOVED, CHANGED, UNCHANGED
 }
 
 data class PackageChange(
@@ -43,22 +40,19 @@ object PackageCatalog {
 
     fun save(context: Context, packages: List<CatalogPackage>) {
         val array = JSONArray()
-
         packages.forEach { pkg ->
-            val item = JSONObject().apply {
-                put("id", pkg.id)
-                put("name", pkg.name)
-                put("file", pkg.file)
-                put("path", pkg.path)
-                put("size", pkg.size)
-                put("modified", pkg.modified)
-                put("type", pkg.type)
-                put("version", pkg.version)
-                put("description", pkg.description)
-            }
+            val item = JSONObject()
+            item.put("id", pkg.id)
+            item.put("name", pkg.name)
+            item.put("file", pkg.file)
+            item.put("path", pkg.path)
+            item.put("size", pkg.size)
+            item.put("modified", pkg.modified)
+            item.put("type", pkg.type)
+            item.put("version", pkg.version)
+            item.put("description", pkg.description)
             array.put(item)
         }
-
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putString(KEY_PACKAGES, array.toString())
@@ -72,16 +66,16 @@ object PackageCatalog {
         return try {
             val array = JSONArray(json)
             buildList {
-                for (i in 0 until array.length()) {
-                    val item = array.getJSONObject(i)
+                for (index in 0 until array.length()) {
+                    val item = array.getJSONObject(index)
                     add(
                         CatalogPackage(
-                            id = item.optString("id", ""),
-                            name = item.optString("name", ""),
-                            file = item.optString("file", ""),
-                            path = item.optString("path", ""),
-                            size = item.optLong("size", 0L),
-                            modified = item.optLong("modified", 0L),
+                            id = item.optString("id"),
+                            name = item.optString("name"),
+                            file = item.optString("file"),
+                            path = item.optString("path"),
+                            size = item.optLong("size"),
+                            modified = item.optLong("modified"),
                             type = item.optString("type", "pkg"),
                             version = item.optString("version", ""),
                             description = item.optString("description", "")
@@ -94,12 +88,8 @@ object PackageCatalog {
         }
     }
 
-    fun synchronize(
-        context: Context,
-        currentPackages: List<CatalogPackage>
-    ): CatalogSyncResult {
+    fun synchronize(context: Context, currentPackages: List<CatalogPackage>): CatalogSyncResult {
         val previousPackages = load(context)
-
         val previousByKey = previousPackages.associateBy { catalogKey(it) }
         val currentByKey = currentPackages.associateBy { catalogKey(it) }
 
@@ -111,11 +101,12 @@ object PackageCatalog {
         for (current in currentPackages) {
             val key = catalogKey(current)
             val previous = previousByKey[key]
-
-            when {
-                previous == null -> added.add(current)
-                hasChanged(previous, current) -> changed.add(current)
-                else -> unchanged.add(current)
+            if (previous == null) {
+                added.add(current)
+            } else if (hasChanged(previous, current)) {
+                changed.add(current)
+            } else {
+                unchanged.add(current)
             }
         }
 
@@ -138,8 +129,7 @@ object PackageCatalog {
     }
 
     private fun catalogKey(pkg: CatalogPackage): String {
-        // Usa o id como chave primária se existir, senão utiliza o path do arquivo
-        return pkg.id.ifBlank { pkg.path }
+        return pkg.path
     }
 
     private fun hasChanged(previous: CatalogPackage, current: CatalogPackage): Boolean {
