@@ -1,0 +1,35 @@
+name: Restore Project
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: "Commit que será restaurado"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restaurar commit
+        run: |
+          git checkout "${{ inputs.commit }}"
+
+      - name: Criar branch de restauração
+        run: |
+          BRANCH="restore/${{ inputs.commit }}"
+          git switch -c "$BRANCH"
+
+      - name: Enviar restauração
+        run: |
+          git push origin HEAD
