@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GTSTORE - PS4 PKG Installer</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 25px; background: #101114; color: #fff; font-family: Arial, Helvetica, sans-serif; }
+        .container { max-width: 850px; margin: auto; }
+        h1 { margin-top: 0; }
+        h2 { margin-top: 0; }
+        .subtitle { color: #999; margin-bottom: 25px; }
+        .panel { background: #1b1d22; border-radius: 12px; padding: 20px; margin-bottom: 18px; border: 1px solid #292c33; }
+        label { display: block; margin-bottom: 8px; color: #aaa; font-weight: bold; }
+        input, select { width: 100%; padding: 13px; margin-bottom: 15px; background: #0f1013; color: #fff; border: 1px solid #444; border-radius: 7px; font-size: 16px; }
+        button { width: 100%; padding: 14px; border: 0; border-radius: 7px; background: #0070d1; color: white; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 5px; }
+        button:disabled { background: #444; color: #999; }
+        .secondary { background: #333840; }
+        .status, .pkg-info { background: #111317; border-radius: 8px; padding: 15px; line-height: 1.8; word-break: break-word; }
+        .online { color: #4caf50; font-weight: bold; }
+        .offline { color: #f44336; font-weight: bold; }
+        #log { min-height: 220px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; background: #08090b; border: 1px solid #333; border-radius: 8px; padding: 15px; font-family: monospace; font-size: 13px; color: #00ff66; }
+        .success { color: #00ff66 !important; }
+        .error { color: #ff5252 !important; }
+        .warning { color: #ffca28 !important; }
+        .info { color: #61dafb !important; }
+        .small { color: #777; font-size: 12px; line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>GTSTORE</h1>
+        <div class="subtitle">PS4 Remote PKG Installer</div>
+        
+        <div class="panel">
+            <div class="status">
+                <strong>Servidor GTSTORE:</strong>
+                <span id="serverStatus" class="offline"> OFFLINE</span><br>
+                <strong>URL:</strong> <span id="serverUrl">Aguardando...</span><br>
+                <strong>Porta:</strong> <span id="serverPort">8080</span><br>
+                <strong>Conexões:</strong> <span id="connections">0</span>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>PS4</h2>
+            <label for="ps4ip">IP do PS4</label>
+            <input type="text" id="ps4ip" placeholder="Ex: 192.168.0.3">
+            <button class="secondary" onclick="testarPS4()">Testar comunicação</button>
+        </div>
+
+        <div class="panel">
+            <h2>PKG</h2>
+            <label for="pkgSelect">Pacote disponível</label>
+            <select id="pkgSelect" onchange="mostrarPkg()">
+                <option value="">Carregando PKGs...</option>
+            </select>
+            <div id="pkgInfo" class="pkg-info">Nenhum PKG selecionado.</div>
+            <button id="installButton" onclick="iniciarInstalacao()" disabled>Enviar jogo para o PS4</button>
+        </div>
+
+        <div class="panel">
+            <h2>Console</h2>
+            <div id="log">
+> GTSTORE iniciado.
+> Aguardando comando...
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="small">
+                Fluxo GTSTORE:<br><br>
+                1. Browser → Android :8080<br>
+                2. Android → TCP RAW → PS4 :9090<br>
+                3. BinLoader recebe o payload<br>
+                4. Android → PS4 :12800<br>
+                5. PS4 registra a URL do PKG<br>
+                6. PS4 baixa o PKG diretamente do Android
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let packages = [];
+        let selectedPackage = null;
+
+        function log(message, type) {
+            const logDiv = document.getElementById("log");
+            if (type) { logDiv.className = type; }
+            logDiv.innerText += "\n> " + message;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function getServerBaseUrl() { 
+            return window.location.origin; 
+        }
+
+        async function carregarStatus() {
+            try {
+                const response = await fetch("/api/status", { cache: "no-cache" });
+                const data = await response.json();
+                const status = document.getElementById("serverStatus");
+                
+                status.innerText = data.online ? " ONLINE" : " OFFLINE";
+                status.className = data.online ? "online" : "offline";
+                document.getElementById("serverUrl").innerText = data.url;
+                document.getElementById("serverPort").innerText = data.port;
+                document.getElementById("connections").innerText = data.activeConnections;
+            } catch (error) {
+                document.getElementById("serverStatus").innerText = " OFFLINE";
+                document.getElementById("serverStatus").className = "offline";
+            }
+        }
+
+        async function carregarPackages() {
+            const select = document.getElementById("pkgSelect");
+            try {
+                const response = await fetch("/api/packages", { cache: "no-cache" });
+                if (!response.ok) { throw new Error("HTTP " + response.status); }
+                const data = await response.json();
+                packages = data.packages || [];
+                select.innerHTML = "";
+                
+                if (packages.length === 0) {
+                    const option = document.createElement("option");
+                    option.value = "";
+                    option.textContent = "Nenhum PKG encontrado";
+                    select.appendChild(option);
+                    log("Nenhum PKG encontrado.", "warning");
+                    return;
+                }
+                
+                const first = document.createElement("option");
+                first.value = "";
+                first.textContent = "Selecione um PKG...";
+                select.appendChild(first);
+                
+                packages.forEach(function(pkg) {
+                    const option = document.createElement("option");
+                    option.value = String(pkg.id);
+                    option.textContent = pkg.name + " (" + pkg.formattedSize + ")";
+                    select.appendChild(option);
+                });
+                log(packages.length + " PKG(s) carregado(s).", "info");
+            } catch (error) {
+                select.innerHTML = "";
+                const option = document.createElement("option");
+                option.value = "";
+                option.textContent = "Erro ao carregar PKGs";
+                select.appendChild(option);
+                log("Erro ao carregar PKGs: " + error.message, "error");
+            }
+        }
+
+        function mostrarPkg() {
+            const select = document.getElementById("pkgSelect");
+            const id = parseInt(select.value);
+            selectedPackage = packages.find(function(pkg) { return pkg.id === id; });
+            
+            const info = document.getElementById("pkgInfo");
+            const button = document.getElementById("installButton");
+            
+            if (!selectedPackage) {
+                info.innerText = "Nenhum PKG selecionado.";
+                button.disabled = true;
+                return;
+            }
+            
+            const url = getServerBaseUrl() + selectedPackage.url;
+            info.innerHTML = "<strong>Nome:</strong> " + escapeHtml(selectedPackage.name) + 
+                             "<br><strong>Tamanho:</strong> " + escapeHtml(selectedPackage.formattedSize) + 
+                             "<br><strong>URL:</strong><br>" + escapeHtml(url);
+            button.disabled = false;
+        }
+
+        async function testarPS4() {
+            const ip = document.getElementById("ps4ip").value.trim();
+            if (!ip) { alert("Informe o IP do PS4."); return; }
+            log("Testando comunicação com o PS4...");
+            try {
+                const response = await fetch("/api/send-payload", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ip: ip, payloadName: "rpi_installer.bin" })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    log("TCP RAW 9090: conexão e envio realizados.", "success");
+                    log("Bytes enviados: " + data.bytes, "success");
+                } else {
+                    log("Falha 9090: " + data.error, "error");
+                }
+            } catch (error) {
+                log("Erro ao testar 9090: " + error.message, "error");
+            }
+        }
+
+        async function enviarPayload(ip) {
+            log("FASE 1: Android → TCP RAW → PS4:9090", "info");
+            log("Payload: rpi_installer.bin");
+            try {
+                const response = await fetch("/api/send-payload", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ip: ip, payloadName: "rpi_installer.bin" })
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    log("Falha na Fase 1: " + (data.error || "erro desconhecido"), "error");
+                    return false;
+                }
+                log("TCP RAW 9090 concluído.", "success");
+                log("Bytes enviados: " + data.bytes, "success");
+                return true;
+            } catch (error) {
+                log("Erro na Fase 1: " + error.message, "error");
+                return false;
+            }
+        }
+
+        async function registrarPkg(ip, pkgUrl) {
+            log("FASE 2: Android → PS4:12800", "info");
+            log("URL enviada ao PS4:\n" + pkgUrl);
+            try {
+                const response = await fetch("/api/install", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ip: ip, pkgUrl: pkgUrl })
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    log("Falha na Fase 2: " + (data.error || "erro desconhecido"), "error");
+                    return false;
+                }
+                log("PS4 recebeu a solicitação de instalação.", "success");
+                if (data.response) { log("Resposta: " + data.response, "success"); }
+                return true;
+            } catch (error) {
+                log("Erro na Fase 2: " + error.message, "error");
+                return false;
+            }
+        }
+
+        async function iniciarInstalacao() {
+            const ip = document.getElementById("ps4ip").value.trim();
+            if (!ip) { alert("Informe o IP do PS4."); return; }
+            if (!selectedPackage) { alert("Selecione um PKG."); return; }
+            
+            const pkgUrl = getServerBaseUrl() + selectedPackage.url;
+            const button = document.getElementById("installButton");
+            button.disabled = true;
+            
+            log("--------------------------------");
+            log("Iniciando instalação...");
+            log("PS4: " + ip);
+            log("PKG: " + selectedPackage.name);
+            log("URL: " + pkgUrl);
+            
+            const payloadOk = await enviarPayload(ip);
+            if (!payloadOk) {
+                log("Instalação interrompida: Fase 1 falhou.", "error");
+                button.disabled = false;
+                return;
+            }
+            
+            log("Aguardando inicialização do payload...");
+            await new Promise(function(resolve) { setTimeout(resolve, 1000); });
+            
+            const pkgOk = await registrarPkg(ip, pkgUrl);
+            if (pkgOk) {
+                log("--------------------------------");
+                log("PROCESSO CONCLUÍDO.", "success");
+            } else {
+                log("Fase 1 concluída, mas Fase 2 falhou.", "warning");
+            }
+            button.disabled = false;
+        }
+
+        function escapeHtml(text) {
+            return String(text)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        window.addEventListener("load", function() {
+            carregarStatus();
+            carregarPackages();
+            setInterval(carregarStatus, 3000);
+        });
+    </script>
+</body>
+</html>
