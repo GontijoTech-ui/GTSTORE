@@ -6,15 +6,14 @@
 
     <!-- Foreground Service -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-
-    <!-- Foreground Service para sincronização/transferência de dados -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <application
         android:name=".GTStoreApplication"
         android:allowBackup="false"
         android:label="GTSTORE"
-        android:supportsRtl="true">
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="true"> <!-- Permite comunicação TCP/HTTP local -->
 
         <activity
             android:name=".MainActivity"
