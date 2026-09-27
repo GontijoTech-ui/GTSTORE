@@ -14,6 +14,9 @@ import android.os.Looper
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
+import com.gtstore.R
+
+
 
 class MainActivity : Activity() {
 
