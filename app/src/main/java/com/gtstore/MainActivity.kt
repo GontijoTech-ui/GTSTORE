@@ -52,8 +52,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private const val PIN_TIMEOUT_MS = 10 * 60 * 1000L // 10 minutos de validade
-
 enum class GTStoreScreen {
     DASHBOARD,
     SERVIDOR,
@@ -507,8 +505,8 @@ fun AdminScreen(
                                 text = "PIN: ${entry.pin}",
                                 style = MaterialTheme.typography.titleMedium
                             )
-                            val elapsed = System.currentTimeMillis() - entry.createdAt
-                            val remainingSeconds = ((PIN_TIMEOUT_MS - elapsed) / 1000L).coerceAtLeast(0L)
+                            val elapsed: Long = System.currentTimeMillis() - entry.createdAt
+                            val remainingSeconds: Long = ((600_000L - elapsed) / 1000L).coerceAtLeast(0L)
                             Text(
                                 text = if (entry.isExpired) "Status: Expirado" else "Expira em: ${remainingSeconds / 60}m ${remainingSeconds % 60}s",
                                 style = MaterialTheme.typography.bodySmall,
