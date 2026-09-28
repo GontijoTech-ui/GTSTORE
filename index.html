@@ -3,190 +3,1165 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GONTIJOTECH - PS4 Store</title>
+
+    <title>GTStore - PS4 Installer</title>
+
     <style>
-        * { box-sizing: border-box; }
-        body { 
-            background-color: #0d0d0d; 
-            color: #ffffff; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            margin: 0; 
-            padding: 20px; 
-            display: flex;
-            justify-content: center;
-            align-items: center;
+        :root {
+            --bg-color: #0d0d0f;
+            --card-bg: #18181b;
+            --card-bg-2: #202024;
+            --primary: #0070cc;
+            --primary-hover: #0085ef;
+            --text-main: #ffffff;
+            --text-muted: #a5a5aa;
+            --danger: #e53935;
+            --success: #35c759;
+            --warning: #ffb020;
+            --border: #303035;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background:
+                radial-gradient(circle at top, #17171b 0%, #0d0d0f 45%, #09090a 100%);
+            color: var(--text-main);
+            margin: 0;
             min-height: 100vh;
         }
 
-        .container { width: 100%; max-width: 600px; text-align: center; }
-
-        /* Estilo do Cabeçalho e Logo */
-        .logo-img {
-            max-width: 280px;
-            height: auto;
-            margin-bottom: 10px;
-        }
-
-        .suporte-info {
-            color: #d13030;
-            font-size: 15px;
-            font-weight: bold;
-            margin-bottom: 20px;
-            letter-spacing: 1px;
-        }
-
-        /* Estilo da Tela de PIN */
-        #pin-screen {
-            background: #181818;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(255, 68, 68, 0.15);
-            border: 1px solid #2a2a2a;
-        }
-
-        .pin-input {
+        header {
             width: 100%;
-            padding: 15px;
-            font-size: 24px;
+            background: rgba(24, 24, 27, 0.96);
+            padding: 18px 15px;
             text-align: center;
-            letter-spacing: 10px;
-            margin: 20px 0;
-            border: 2px solid #333;
-            border-radius: 8px;
-            background: #242424;
-            color: #fff;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
+            border-bottom: 1px solid #29292e;
         }
 
-        .pin-input:focus { border-color: #d13030; outline: none; }
+        .logo {
+            display: block;
+            width: 90px;
+            height: 90px;
+            object-fit: contain;
+            margin: 0 auto 8px;
+            border-radius: 14px;
+        }
 
-        /* Estilo da Loja de Jogos */
-        #store-screen { display: none; width: 100%; text-align: left; }
+        header h1 {
+            margin: 0;
+            font-size: 27px;
+            letter-spacing: 3px;
+        }
 
-        .header-store {
+        header p {
+            margin: 5px 0 0;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        .container {
+            width: 92%;
+            max-width: 850px;
+            margin: 22px auto 50px;
+        }
+
+        .panel {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            padding: 20px;
+            border-radius: 14px;
+            margin-bottom: 20px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.30);
+        }
+
+        .panel-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .config-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: stretch;
+        }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+            min-width: 250px;
+        }
+
+        .input-group label {
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 7px;
+            border: 1px solid #3b3b42;
+            background-color: #111114;
+            color: white;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .input-group input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(0,112,204,0.18);
+        }
+
+        button {
+            font-family: inherit;
+        }
+
+        .btn-scan,
+        .btn-save {
+            border: none;
+            padding: 11px 15px;
+            border-radius: 7px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            white-space: nowrap;
+        }
+
+        .btn-scan {
+            background: #3a3a40;
+        }
+
+        .btn-scan:hover {
+            background: #4a4a50;
+        }
+
+        .btn-save {
+            background: #444;
+        }
+
+        .btn-save:hover {
+            background: #555;
+        }
+
+        .status-badge {
+            margin-top: 15px;
+            padding: 11px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            background-color: #303035;
+            text-align: center;
+        }
+
+        .status-online {
+            background-color: rgba(53, 199, 89, 0.18);
+            color: #5ee77a;
+            border: 1px solid rgba(53,199,89,0.35);
+        }
+
+        .status-offline {
+            background-color: rgba(229,57,53,0.18);
+            color: #ff6966;
+            border: 1px solid rgba(229,57,53,0.35);
+        }
+
+        .status-scanning {
+            background-color: rgba(255,176,32,0.16);
+            color: #ffc44d;
+            border: 1px solid rgba(255,176,32,0.35);
+        }
+
+        .help-text {
+            margin-top: 10px;
+            color: var(--text-muted);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .pkg-list {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .pkg-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            padding: 18px;
+            border-radius: 12px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
-            border-bottom: 1px solid #333;
-            padding-bottom: 15px;
+            gap: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.20);
+            transition: transform 0.15s, border-color 0.15s;
         }
 
-        .card { 
-            background: #181818; 
-            border-radius: 8px; 
-            padding: 20px; 
-            margin-bottom: 12px; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            border: 1px solid #262626;
+        .pkg-card:hover {
+            transform: translateY(-2px);
+            border-color: #44444c;
         }
 
-        .btn { 
-            background: #d13030; 
-            color: white; 
-            border: none; 
-            padding: 12px 24px; 
-            font-size: 16px; 
+        .pkg-info {
+            min-width: 0;
+        }
+
+        .pkg-info h3 {
+            margin: 0 0 6px;
+            font-size: 17px;
+            word-break: break-word;
+        }
+
+        .pkg-info p {
+            margin: 0;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 11px 18px;
+            border-radius: 7px;
+            font-size: 15px;
+            cursor: pointer;
             font-weight: bold;
-            border-radius: 6px; 
-            cursor: pointer; 
-            transition: background 0.2s;
+            white-space: nowrap;
+            transition: background-color 0.2s;
         }
 
-        .btn:hover { background: #b02424; }
-        .error-msg { color: #ff5252; margin-top: 10px; display: none; }
+        .btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+        }
+
+        .empty {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 25px;
+        }
+
+        .error {
+            color: #ff6966;
+        }
+
+        .success {
+            color: #5ee77a;
+        }
+
+        footer {
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+            padding: 20px;
+        }
+
+        @media (max-width: 650px) {
+            .container {
+                width: 94%;
+            }
+
+            .config-row {
+                flex-direction: column;
+            }
+
+            .input-group {
+                width: 100%;
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .input-group label {
+                margin-bottom: 2px;
+            }
+
+            .btn-scan,
+            .btn-save {
+                width: 100%;
+            }
+
+            .pkg-card {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .pkg-card .btn {
+                width: 100%;
+            }
+        }
     </style>
 </head>
+
 <body>
 
-    <div class="container">
-        <!-- LOGO GONTIJOTECH E SUPORTE -->
-        <img src="logo.jpg" alt="GONTIJOTECH" class="logo-img">
-        <div class="suporte-info">SUPORTE: (64) 99225-9727</div>
+<header>
+    <!-- logo.jpg deve estar na raiz de assets -->
+    <img src="/logo.jpg" class="logo" alt="GTStore">
 
-        <!-- TELA DE BLOQUEIO / PIN -->
-        <div id="pin-screen">
-            <h2 style="margin-top: 0;">Acesso Restrito</h2>
-            <p style="color: #aaa; font-size: 16px;">Informe o PIN fornecido pelo seu provedor:</p>
-            <input type="password" id="pin-field" class="pin-input" maxlength="4" placeholder="••••">
-            <button class="btn" style="width: 100%;" onclick="validarPin()">ENTRAR</button>
-            <p id="error-msg" class="error-msg">PIN incorreto ou inválido! Solicite o código ao suporte.</p>
+    <h1>GTSTORE</h1>
+    <p>PS4 Installer</p>
+</header>
+
+<div class="container">
+
+    <!-- CONFIGURAÇÃO DO PS4 -->
+    <div class="panel">
+
+        <div class="panel-title">
+            🎮 PS4
         </div>
 
-        <!-- TELA DO CATÁLOGO DE JOGOS -->
-        <div id="store-screen">
-            <div class="header-store">
-                <h2 style="margin: 0;">Catálogo de Jogos</h2>
-                <span style="font-size: 13px; color: #aaa;">GONTIJOTECH OTG</span>
+        <div class="config-row">
+
+            <div class="input-group">
+                <label for="ps4-ip">IP:</label>
+
+                <input
+                    type="text"
+                    id="ps4-ip"
+                    placeholder="Ex.: 192.168.1.100"
+                    autocomplete="off"
+                    inputmode="decimal"
+                >
             </div>
-            <div id="lista-jogos">Carregando jogos...</div>
+
+            <button
+                class="btn-scan"
+                id="btn-scan"
+                onclick="autoDetectPs4Ip()"
+            >
+                🔍 Procurar PS4
+            </button>
+
+            <button
+                class="btn-save"
+                onclick="saveManualIp()"
+            >
+                💾 Guardar
+            </button>
+
         </div>
+
+        <div
+            id="status-indicator"
+            class="status-badge status-scanning"
+        >
+            A verificar servidor...
+        </div>
+
+        <div class="help-text">
+            O sistema tenta localizar o PS4 automaticamente.
+            Se não encontrar, digite o IP do PS4 acima e pressione
+            <b>Guardar</b>.
+        </div>
+
     </div>
 
-    <script>
-        let pinDoDia = null;
-        let jogosLista = [];
+    <!-- PACOTES -->
+    <div class="panel">
 
-        // Baixa o jogos.json e lê o PIN atualizado
-        window.onload = function() {
-            fetch('jogos.json?t=' + new Date().getTime())
-                .then(res => res.json())
-                .then(data => {
-                    pinDoDia = data.pin;
-                    jogosLista = data.pkgs;
-                })
-                .catch(err => {
-                    alert('Erro ao conectar ao repositório ou servidor.');
-                });
-        };
+        <div class="panel-title">
+            📦 Pacotes disponíveis
+        </div>
 
-        function validarPin() {
-            const pinDigitado = document.getElementById('pin-field').value;
-            const errorMsg = document.getElementById('error-msg');
+        <div id="pkg-container" class="pkg-list">
+            <div class="empty">
+                A carregar pacotes...
+            </div>
+        </div>
 
-            if (pinDoDia && pinDigitado === pinDoDia) {
-                document.getElementById('pin-screen').style.display = 'none';
-                document.getElementById('store-screen').style.display = 'block';
-                renderizarJogos();
+    </div>
+
+</div>
+
+<footer>
+    GTStore
+</footer>
+
+
+<script>
+
+    /*
+     * ============================================================
+     * CONFIGURAÇÃO INICIAL
+     * ============================================================
+     */
+
+    document.addEventListener('DOMContentLoaded', async () => {
+
+        const savedIp = localStorage.getItem('gtstore_ps4_ip');
+
+        if (savedIp && isValidIp(savedIp)) {
+            document.getElementById('ps4-ip').value = savedIp;
+
+            setStatus(
+                'IP guardado encontrado. A verificar PS4...',
+                'scanning'
+            );
+        } else {
+            setStatus(
+                'A procurar o PS4 automaticamente...',
+                'scanning'
+            );
+        }
+
+        /*
+         * Primeiro verifica o servidor Android.
+         */
+        await checkStatus();
+
+        /*
+         * Depois tenta descobrir o PS4.
+         */
+        await autoDetectPs4Ip();
+
+        /*
+         * Finalmente carrega os PKGs.
+         */
+        await loadPackages();
+    });
+
+
+    /*
+     * ============================================================
+     * STATUS
+     * ============================================================
+     */
+
+    function setStatus(message, type) {
+
+        const indicator =
+            document.getElementById('status-indicator');
+
+        indicator.textContent = message;
+
+        indicator.className = 'status-badge';
+
+        if (type === 'online') {
+            indicator.classList.add('status-online');
+        }
+
+        if (type === 'offline') {
+            indicator.classList.add('status-offline');
+        }
+
+        if (type === 'scanning') {
+            indicator.classList.add('status-scanning');
+        }
+    }
+
+
+    async function checkStatus() {
+
+        try {
+
+            const res = await fetch(
+                '/api/status',
+                {
+                    cache: 'no-store'
+                }
+            );
+
+            if (!res.ok) {
+                throw new Error('Servidor respondeu ' + res.status);
+            }
+
+            const data = await res.json();
+
+            if (data.online) {
+
+                setStatus(
+                    '🟢 Servidor Android Online (' +
+                    data.localAddress +
+                    ':' +
+                    data.port +
+                    ')',
+                    'online'
+                );
+
+                return data;
+
             } else {
-                errorMsg.style.display = 'block';
-                document.getElementById('pin-field').value = '';
+
+                setStatus(
+                    '🔴 Servidor Android Offline',
+                    'offline'
+                );
+
+                return data;
+            }
+
+        } catch (e) {
+
+            setStatus(
+                '🔴 Não foi possível contactar o servidor Android',
+                'offline'
+            );
+
+            return null;
+        }
+    }
+
+
+    /*
+     * ============================================================
+     * DETECÇÃO DO IP DO PS4
+     * ============================================================
+     */
+
+    async function autoDetectPs4Ip() {
+
+        const input =
+            document.getElementById('ps4-ip');
+
+        const scanButton =
+            document.getElementById('btn-scan');
+
+        scanButton.disabled = true;
+        scanButton.textContent = '🔎 A procurar...';
+
+        setStatus(
+            '🔎 A procurar o PS4 na rede local...',
+            'scanning'
+        );
+
+        try {
+
+            const res = await fetch(
+                '/api/status',
+                {
+                    cache: 'no-store'
+                }
+            );
+
+            if (!res.ok) {
+                throw new Error('Falha no status');
+            }
+
+            const data = await res.json();
+
+            /*
+             * ----------------------------------------------------
+             * 1. Se o navegador estiver aberto no próprio PS4,
+             *    o servidor recebe o IP do cliente.
+             * ----------------------------------------------------
+             */
+
+            const clientIp = data.clientIp || '';
+
+            if (
+                isValidIp(clientIp) &&
+                clientIp !== '127.0.0.1' &&
+                clientIp !== data.localAddress
+            ) {
+
+                input.value = clientIp;
+
+                localStorage.setItem(
+                    'gtstore_ps4_ip',
+                    clientIp
+                );
+
+                setStatus(
+                    '🟢 PS4 detetado: ' + clientIp,
+                    'online'
+                );
+
+                return clientIp;
+            }
+
+
+            /*
+             * ----------------------------------------------------
+             * 2. Se já existe um IP guardado, não o substituímos
+             *    imediatamente.
+             * ----------------------------------------------------
+             */
+
+            const savedIp =
+                localStorage.getItem('gtstore_ps4_ip');
+
+            if (isValidIp(savedIp)) {
+
+                input.value = savedIp;
+
+                setStatus(
+                    '🟢 IP do PS4 guardado: ' + savedIp,
+                    'online'
+                );
+
+                return savedIp;
+            }
+
+
+            /*
+             * ----------------------------------------------------
+             * 3. Tenta alguns IPs comuns da mesma sub-rede.
+             *
+             * Atenção: navegadores normalmente não conseguem
+             * testar diretamente uma porta TCP através de fetch
+             * devido às políticas de segurança/CORS.
+             *
+             * Portanto esta é apenas uma tentativa adicional.
+             * ----------------------------------------------------
+             */
+
+            const androidIp = data.localAddress;
+
+            if (!isValidIp(androidIp)) {
+
+                showManualIpMessage();
+
+                return null;
+            }
+
+            const lastDot =
+                androidIp.lastIndexOf('.');
+
+            if (lastDot < 0) {
+
+                showManualIpMessage();
+
+                return null;
+            }
+
+            const subnet =
+                androidIp.substring(0, lastDot + 1);
+
+            const commonHosts = [
+                2,
+                10,
+                20,
+                30,
+                50,
+                80,
+                100,
+                101,
+                102,
+                103,
+                104,
+                105,
+                110,
+                150,
+                200,
+                201,
+                202
+            ];
+
+            for (const host of commonHosts) {
+
+                const testIp =
+                    subnet + host;
+
+                if (testIp === androidIp) {
+                    continue;
+                }
+
+                try {
+
+                    const controller =
+                        new AbortController();
+
+                    const timeout =
+                        setTimeout(
+                            () => controller.abort(),
+                            500
+                        );
+
+                    await fetch(
+                        'http://' +
+                        testIp +
+                        ':9090',
+                        {
+                            mode: 'no-cors',
+                            signal: controller.signal,
+                            cache: 'no-store'
+                        }
+                    );
+
+                    clearTimeout(timeout);
+
+                    /*
+                     * Se o fetch chegou aqui, consideramos que
+                     * houve resposta.
+                     */
+
+                    input.value = testIp;
+
+                    localStorage.setItem(
+                        'gtstore_ps4_ip',
+                        testIp
+                    );
+
+                    setStatus(
+                        '🟢 PS4 detetado: ' + testIp,
+                        'online'
+                    );
+
+                    return testIp;
+
+                } catch (e) {
+                    /*
+                     * Continua procurando.
+                     */
+                }
+            }
+
+            /*
+             * ----------------------------------------------------
+             * 4. Não encontrou.
+             *
+             * NÃO bloqueia o cliente.
+             *
+             * O campo fica disponível para digitação manual.
+             * ----------------------------------------------------
+             */
+
+            showManualIpMessage();
+
+            return null;
+
+        } catch (e) {
+
+            showManualIpMessage();
+
+            return null;
+
+        } finally {
+
+            scanButton.disabled = false;
+            scanButton.textContent = '🔍 Procurar PS4';
+        }
+    }
+
+
+    function showManualIpMessage() {
+
+        const input =
+            document.getElementById('ps4-ip');
+
+        if (!input.value.trim()) {
+
+            setStatus(
+                '🟠 PS4 não detetado. Digite o IP do PS4 manualmente.',
+                'scanning'
+            );
+
+            input.focus();
+
+        } else {
+
+            setStatus(
+                '🟢 Utilize o IP informado: ' +
+                input.value.trim(),
+                'online'
+            );
+        }
+    }
+
+
+    /*
+     * ============================================================
+     * GUARDAR IP MANUAL
+     * ============================================================
+     */
+
+    function saveManualIp() {
+
+        const input =
+            document.getElementById('ps4-ip');
+
+        const ip =
+            input.value.trim();
+
+        if (!isValidIp(ip)) {
+
+            alert(
+                '⚠️ IP inválido.\n\n' +
+                'Digite um endereço como:\n' +
+                '192.168.1.100'
+            );
+
+            input.focus();
+
+            return;
+        }
+
+        localStorage.setItem(
+            'gtstore_ps4_ip',
+            ip
+        );
+
+        setStatus(
+            '🟢 IP do PS4 guardado: ' + ip,
+            'online'
+        );
+
+        alert(
+            '✅ IP do PS4 guardado:\n\n' + ip
+        );
+    }
+
+
+    /*
+     * ============================================================
+     * VALIDAR IPv4
+     * ============================================================
+     */
+
+    function isValidIp(ip) {
+
+        if (!ip) {
+            return false;
+        }
+
+        const parts =
+            ip.trim().split('.');
+
+        if (parts.length !== 4) {
+            return false;
+        }
+
+        return parts.every(part => {
+
+            if (!/^\d+$/.test(part)) {
+                return false;
+            }
+
+            const value =
+                Number(part);
+
+            return value >= 0 && value <= 255;
+        });
+    }
+
+
+    /*
+     * ============================================================
+     * CARREGAR PACOTES
+     * ============================================================
+     */
+
+    async function loadPackages() {
+
+        const container =
+            document.getElementById('pkg-container');
+
+        try {
+
+            const res = await fetch(
+                '/api/packages',
+                {
+                    cache: 'no-store'
+                }
+            );
+
+            if (!res.ok) {
+                throw new Error(
+                    'HTTP ' + res.status
+                );
+            }
+
+            const data =
+                await res.json();
+
+            container.innerHTML = '';
+
+            if (
+                !data.packages ||
+                data.count === 0
+            ) {
+
+                container.innerHTML = `
+                    <div class="empty">
+                        Nenhum PKG encontrado na pasta
+                        selecionada no Android.
+                    </div>
+                `;
+
+                return;
+            }
+
+            data.packages.forEach(pkg => {
+
+                const card =
+                    document.createElement('div');
+
+                card.className = 'pkg-card';
+
+                const info =
+                    document.createElement('div');
+
+                info.className = 'pkg-info';
+
+                const title =
+                    document.createElement('h3');
+
+                title.textContent =
+                    pkg.name;
+
+                const size =
+                    document.createElement('p');
+
+                size.textContent =
+                    'Tamanho: ' +
+                    pkg.formattedSize;
+
+                info.appendChild(title);
+                info.appendChild(size);
+
+
+                const button =
+                    document.createElement('button');
+
+                button.className = 'btn';
+
+                button.id =
+                    'btn-' + pkg.id;
+
+                button.textContent =
+                    'Instalar no PS4';
+
+                button.onclick =
+                    () => installDPI(pkg.id);
+
+
+                card.appendChild(info);
+                card.appendChild(button);
+
+                container.appendChild(card);
+            });
+
+        } catch (e) {
+
+            container.innerHTML = `
+                <div class="empty error">
+                    ❌ Erro ao carregar os pacotes.
+                    <br>
+                    <small>${escapeHtml(e.message)}</small>
+                </div>
+            `;
+        }
+    }
+
+
+    /*
+     * ============================================================
+     * INSTALAÇÃO DPI
+     * ============================================================
+     */
+
+    async function installDPI(pkgId) {
+
+        const input =
+            document.getElementById('ps4-ip');
+
+        const ip =
+            input.value.trim();
+
+        /*
+         * Se não existe IP, pedimos ao cliente.
+         */
+
+        if (!ip) {
+
+            alert(
+                '🎮 IP do PS4 necessário.\n\n' +
+                'Digite o IP do seu PS4 antes de instalar.'
+            );
+
+            input.focus();
+
+            setStatus(
+                '🟠 Digite o IP do PS4 para continuar.',
+                'scanning'
+            );
+
+            return;
+        }
+
+
+        /*
+         * Validação.
+         */
+
+        if (!isValidIp(ip)) {
+
+            alert(
+                '⚠️ O IP informado não é válido.'
+            );
+
+            input.focus();
+
+            return;
+        }
+
+
+        /*
+         * Guarda o IP para a próxima vez.
+         */
+
+        localStorage.setItem(
+            'gtstore_ps4_ip',
+            ip
+        );
+
+
+        const btn =
+            document.getElementById(
+                'btn-' + pkgId
+            );
+
+        if (!btn) {
+            return;
+        }
+
+        const originalText =
+            btn.textContent;
+
+        btn.textContent =
+            '⏳ A enviar...';
+
+        btn.disabled = true;
+
+
+        setStatus(
+            '⏳ A enviar solicitação para o PS4 ' +
+            ip + '...',
+            'scanning'
+        );
+
+
+        try {
+
+            const res =
+                await fetch(
+                    '/api/install-dpi',
+                    {
+                        method: 'POST',
+
+                        headers: {
+                            'Accept':
+                                'application/json',
+
+                            'Content-Type':
+                                'application/json'
+                        },
+
+                        body: JSON.stringify({
+                            ip: ip,
+                            pkgId: pkgId
+                        })
+                    }
+                );
+
+
+            const data =
+                await res.json();
+
+
+            if (data.success) {
+
+                btn.textContent =
+                    'Enviado ✔️';
+
+                setStatus(
+                    '🟢 Solicitação enviada para o PS4.',
+                    'online'
+                );
+
+                alert(
+                    '✅ SUCESSO!\n\n' +
+                    data.message
+                );
+
+            } else {
+
+                btn.textContent =
+                    'Falhou';
+
+                setStatus(
+                    '🔴 Falha na instalação.',
+                    'offline'
+                );
+
+                alert(
+                    '❌ ERRO DO SERVIDOR\n\n' +
+                    (data.error ||
+                     'Erro desconhecido.')
+                );
+
+            }
+
+        } catch (e) {
+
+            btn.textContent =
+                'Erro';
+
+            setStatus(
+                '🔴 Erro de comunicação com o servidor.',
+                'offline'
+            );
+
+            alert(
+                '⚠️ ERRO DE REDE\n\n' +
+                e.message +
+                '\n\n' +
+                'Verifique se o PS4 está na mesma rede ' +
+                'e se o BinLoader está ativo.'
+            );
+
+        } finally {
+
+            if (
+                btn.textContent !== 'Enviado ✔️'
+            ) {
+
+                setTimeout(() => {
+
+                    btn.textContent =
+                        originalText;
+
+                    btn.disabled =
+                        false;
+
+                }, 3000);
             }
         }
+    }
 
-        function renderizarJogos() {
-            let html = '';
-            if (!jogosLista || jogosLista.length === 0) {
-                html = '<p style="text-align: center; color: #aaa;">Nenhum jogo .pkg foi encontrado no HD Externo.</p>';
-            } else {
-                jogosLista.forEach(jogo => {
-                    html += `
-                        <div class="card">
-                            <div>
-                                <h3 style="margin: 0 0 8px 0; color: #fff;">${jogo.name}</h3>
-                                <p style="margin: 0; color: #888; font-size: 14px;">Tamanho: ${jogo.size}</p>
-                            </div>
-                            <button class="btn" onclick="instalarPkg('${jogo.url}')">Instalar</button>
-                        </div>
-                    `;
-                });
-            }
-            document.getElementById('lista-jogos').innerHTML = html;
-        }
 
-        function instalarPkg(urlPkg) {
-            fetch('http://127.0.0.1:12800/api/install', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    type: 'direct',
-                    packages: [ urlPkg ]
-                })
-            })
-            .then(res => alert('Download iniciado! Verifique as Transferências no PS4.'))
-            .catch(err => alert('Erro: Certifique-se de que o GoldHEN / Remote PKG Installer está ativo no PS4.'));
-        }
-    </script>
+    /*
+     * ============================================================
+     * SEGURANÇA PARA MENSAGENS DE ERRO
+     * ============================================================
+     */
+
+    function escapeHtml(text) {
+
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+</script>
+
 </body>
 </html>
