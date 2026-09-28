@@ -10,19 +10,16 @@ import java.security.MessageDigest
 
 /**
  * Lê TITLE, CONTENT_ID, CATEGORY, icon0.png e o digest do cabeçalho de um PKG do PS4 via SAF.
- * NÃO TESTADO em PKG real: o layout está escrito de memória (LibOrbisPkg não veio no zip do DPI).
- * O campo digestMatches indica se o digest guardado em 0xFE0 confere com o SHA-256 dos
- * primeiros 0xFE0 bytes, o que confirma (ou refuta) a suposição do offset.
  */
 object PkgMetaReader {
 
     data class Meta(
         val title: String,
         val contentId: String,
-        val category: String, // "gd", "gp", "ac"...
+        val category: String, // "gd" (GAME), "gp" (UPDATE), "ac" (DLC)...
         val icon: ByteArray?,
         val digest: String,         // 64 caracteres hex maiúsculos (32 bytes em 0xFE0)
-        val digestMatches: Boolean, // digest guardado == SHA-256(primeiros 0xFE0 bytes)
+        val digestMatches: Boolean  // digest guardado == SHA-256(primeiros 0xFE0 bytes)
     ) {
         val bgftType: String get() = "PS4" + category.uppercase()
     }
@@ -37,7 +34,7 @@ object PkgMetaReader {
         context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
             FileInputStream(pfd.fileDescriptor).channel.let { parse(it) }
         }
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         null
     }
 
@@ -77,7 +74,7 @@ object PkgMetaReader {
             category = p["CATEGORY"] ?: return null,
             icon = icon,
             digest = stored.joinToString("") { "%02X".format(it) },
-            digestMatches = stored.contentEquals(computed),
+            digestMatches = stored.contentEquals(computed)
         )
     }
 
@@ -92,7 +89,7 @@ object PkgMetaReader {
         return buf.array()
     }
 
-    /** PARAM.SFO (little-endian); só campos de texto (formato 0x0204). */
+    /** PARAM.SFO (little-endian); campos em formato de texto (0x0204). */
     private fun parseSfo(b: ByteArray): Map<String, String> {
         val bb = ByteBuffer.wrap(b).order(ByteOrder.LITTLE_ENDIAN)
         if (b.size < 20 || bb.getInt(0) != 0x46535000) return emptyMap()
@@ -109,7 +106,7 @@ object PkgMetaReader {
             if (fmt != 0x0204) continue
             val ks = keyTable + keyOff
             var ke = ks
-            while (b[ke] != 0.toByte()) ke++
+            while (ke < b.size && b[ke] != 0.toByte()) ke++
             out[String(b, ks, ke - ks, Charsets.UTF_8)] =
                 String(b, dataTable + dataOff, len, Charsets.UTF_8).trimEnd('\u0000')
         }
