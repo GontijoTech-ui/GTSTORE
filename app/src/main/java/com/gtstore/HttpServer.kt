@@ -28,8 +28,12 @@ import java.util.concurrent.atomic.AtomicInteger
 
 const val PIN_TIMEOUT_MS = 10 * 60 * 1000L // 10 minutos de validade
 
-data class PinEntry(
+data class PinRequest(
+    val id: Long,
+    val gameTitle: String,
+    val gameKey: String,
     val pin: String,
+    val clientIp: String,
     val createdAt: Long = System.currentTimeMillis()
 ) {
     val isExpired: Boolean
@@ -64,18 +68,32 @@ class HttpServer(
     private val activeConnections = AtomicInteger(0)
     private val logLines = Collections.synchronizedList(ArrayList<String>())
 
-    private val generatedPins = ConcurrentHashMap<String, PinEntry>()
+    // Lista de solicitações de PIN ativas (exclusivas por jogo)
+    private val pinRequests = Collections.synchronizedList(ArrayList<PinRequest>())
 
-    fun generateAdminPin(): String {
-        val pin = (100000..999999).random().toString()
-        generatedPins[pin] = PinEntry(pin)
-        dbg("PIN gerado pelo Admin: $pin (válido por 10 min)")
-        return pin
+    fun getPinRequests(): List<PinRequest> {
+        synchronized(pinRequests) {
+            pinRequests.removeAll { (System.currentTimeMillis() - it.createdAt) > 60 * 60 * 1000L }
+            return ArrayList(pinRequests)
+        }
     }
 
-    fun getActivePinsList(): List<PinEntry> {
-        generatedPins.entries.removeIf { (System.currentTimeMillis() - it.value.createdAt) > 60 * 60 * 1000L }
-        return generatedPins.values.toList().sortedByDescending { it.createdAt }
+    fun createPinForGame(gameTitle: String, gameKey: String, clientIp: String = ""): PinRequest {
+        val pin = (100000..999999).random().toString()
+        val req = PinRequest(
+            id = System.currentTimeMillis(),
+            gameTitle = gameTitle,
+            gameKey = gameKey,
+            pin = pin,
+            clientIp = clientIp,
+            createdAt = System.currentTimeMillis()
+        )
+        synchronized(pinRequests) {
+            pinRequests.add(0, req)
+            while (pinRequests.size > 80) pinRequests.removeAt(pinRequests.size - 1)
+        }
+        dbg("PIN gerado para $gameTitle ($gameKey): $pin")
+        return req
     }
 
     private fun dbg(msg: String) {
@@ -258,30 +276,61 @@ class HttpServer(
         val uri = Uri.parse(target)
         when (uri.path ?: "/") {
             "/api/install-dpi" -> handleDirectInstallDpi(body, headers, output, clientIp)
+            "/api/request-pin" -> handlePinRequest(body, output, clientIp)
             "/api/verify-pin" -> handleVerifyPin(body, output)
             else -> sendJsonError(output, 404, "Endpoint não encontrado")
         }
     }
 
+    // 3 & 4: RECEBE A SOLICITAÇÃO DO PS4 E CRIA O PIN EXCLUSIVO PARA O CONTEÚDO
+    private fun handlePinRequest(body: ByteArray, output: OutputStream, clientIp: String) {
+        try {
+            val json = JSONObject(String(body, StandardCharsets.UTF_8))
+            val title = json.optString("title", "Jogo")
+            val gameKey = json.optString("gameKey", "")
+
+            if (gameKey.isBlank()) {
+                sendJsonError(output, 400, "Código do jogo inválido.")
+                return
+            }
+
+            val req = createPinForGame(title, gameKey, clientIp)
+            sendJson(output, 200, JSONObject().put("success", true).put("requestId", req.id))
+        } catch (_: Exception) {
+            sendJsonError(output, 400, "Dados inválidos.")
+        }
+    }
+
+    // 4: VALIDAÇÃO RIGOROSA: PIN SÓ É VÁLIDO SE BATER COM O CONTEÚDO ACESSADO
     private fun handleVerifyPin(body: ByteArray, output: OutputStream) {
         try {
             val json = JSONObject(String(body, StandardCharsets.UTF_8))
             val pin = json.optString("pin").trim()
+            val gameKey = json.optString("gameKey").trim()
 
             if (pin == MASTER_PIN) {
                 sendJson(output, 200, JSONObject().put("valid", true))
                 return
             }
 
-            val entry = generatedPins[pin]
-            if (entry == null) {
-                sendJson(output, 200, JSONObject().put("valid", false).put("message", "PIN inválido ou incorreto."))
+            val matching = getPinRequests().firstOrNull { it.pin == pin }
+            if (matching == null) {
+                sendJson(output, 200, JSONObject().put("valid", false).put("message", "PIN incorreto ou não encontrado."))
                 return
             }
 
-            if (entry.isExpired) {
-                generatedPins.remove(pin)
+            if (matching.isExpired) {
                 sendJson(output, 200, JSONObject().put("valid", false).put("message", "Este PIN expirou! O prazo de 10 minutos encerrou."))
+                return
+            }
+
+            // Exclusividade do conteúdo
+            if (!matching.gameKey.equals(gameKey, ignoreCase = true)) {
+                sendJson(
+                    output,
+                    200,
+                    JSONObject().put("valid", false).put("message", "Este PIN é exclusivo para o jogo: ${matching.gameTitle}")
+                )
                 return
             }
 
