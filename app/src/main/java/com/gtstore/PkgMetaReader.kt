@@ -6,11 +6,13 @@ import java.io.FileInputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.FileChannel
+import java.security.MessageDigest
 
 /**
- * Lê TITLE, CONTENT_ID, CATEGORY e icon0.png de um PKG do PS4 via SAF (content://).
- * NÃO TESTADO: o layout do PKG (IDs 0x1000/0x1200, tabela de 32 bytes) está escrito de memória,
- * porque a LibOrbisPkg não veio no zip do DPI. Se devolver null para um PKG válido, o erro está aqui.
+ * Lê TITLE, CONTENT_ID, CATEGORY, icon0.png e o digest do cabeçalho de um PKG do PS4 via SAF.
+ * NÃO TESTADO em PKG real: o layout está escrito de memória (LibOrbisPkg não veio no zip do DPI).
+ * O campo digestMatches indica se o digest guardado em 0xFE0 confere com o SHA-256 dos
+ * primeiros 0xFE0 bytes, o que confirma (ou refuta) a suposição do offset.
  */
 object PkgMetaReader {
 
@@ -19,6 +21,8 @@ object PkgMetaReader {
         val contentId: String,
         val category: String, // "gd", "gp", "ac"...
         val icon: ByteArray?,
+        val digest: String,         // 64 caracteres hex maiúsculos (32 bytes em 0xFE0)
+        val digestMatches: Boolean, // digest guardado == SHA-256(primeiros 0xFE0 bytes)
     ) {
         val bgftType: String get() = "PS4" + category.uppercase()
     }
@@ -26,6 +30,8 @@ object PkgMetaReader {
     private const val MAGIC = 0x7F434E54
     private const val ID_PARAM_SFO = 0x1000
     private const val ID_ICON0_PNG = 0x1200
+    private const val HEADER_SIZE = 0x1000
+    private const val DIGEST_OFFSET = 0xFE0
 
     fun read(context: Context, uri: Uri): Meta? = try {
         context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
@@ -36,7 +42,8 @@ object PkgMetaReader {
     }
 
     private fun parse(ch: FileChannel): Meta? {
-        val h = ByteBuffer.wrap(readAt(ch, 0, 0x100)).order(ByteOrder.BIG_ENDIAN)
+        val head = readAt(ch, 0, HEADER_SIZE)
+        val h = ByteBuffer.wrap(head).order(ByteOrder.BIG_ENDIAN)
         if (h.getInt(0) != MAGIC) return null
 
         val entryCount = h.getInt(0x10)
@@ -60,11 +67,17 @@ object PkgMetaReader {
         }
 
         val p = parseSfo(sfo ?: return null)
+
+        val stored = head.copyOfRange(DIGEST_OFFSET, DIGEST_OFFSET + 32)
+        val computed = MessageDigest.getInstance("SHA-256").digest(head.copyOfRange(0, DIGEST_OFFSET))
+
         return Meta(
             title = p["TITLE"] ?: return null,
             contentId = p["CONTENT_ID"] ?: return null,
             category = p["CATEGORY"] ?: return null,
             icon = icon,
+            digest = stored.joinToString("") { "%02X".format(it) },
+            digestMatches = stored.contentEquals(computed),
         )
     }
 
