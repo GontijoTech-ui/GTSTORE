@@ -62,7 +62,6 @@
             background: #151515; color: var(--text); cursor: pointer; font-weight: 700; outline: none;
         }
 
-        /* GRADE DA PÁGINA INICIAL */
         .catalog {
             display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 20px;
         }
@@ -87,14 +86,12 @@
         }
         .game-id { margin: 0 0 12px; color: var(--muted); font-size: 11px; }
 
-        /* BOTÃO ACESSAR NA PÁGINA INICIAL */
         .btn-access {
             width: 100%; border: 0; border-radius: 6px; padding: 12px;
             background: var(--primary); color: white; font-size: 13px; font-weight: 800;
             cursor: pointer; outline: none; text-align: center;
         }
 
-        /* FOCO COM O CONTROLE DO PS4 */
         .btn-access:focus, .btn-access:hover,
         .btn-install:focus, .btn-install:hover,
         .btn-sec:focus, .btn-sec:hover,
@@ -105,7 +102,6 @@
             z-index: 5;
         }
 
-        /* PÁGINA DE DETALHES DO JOGO */
         .view-details {
             display: none; background: #0a0a0a; border: 1px solid var(--border);
             border-radius: 14px; padding: 24px; margin-top: 10px;
@@ -133,7 +129,6 @@
         .btn-install-upd { background: #2f5379; }
         .btn-install-dlc { background: #633994; }
 
-        /* MODAIS */
         .overlay {
             position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
             padding: 20px; background: rgba(0, 0, 0, 0.92); z-index: 1000;
@@ -141,25 +136,37 @@
         .overlay.visible { display: flex; }
 
         .modal {
-            width: 100%; max-width: 500px; background: #121212; border: 1px solid var(--border);
-            border-radius: 12px; padding: 24px; text-align: center;
+            width: 100%; max-width: 480px; background: #121212; border: 1px solid var(--border);
+            border-radius: 12px; padding: 22px; text-align: center;
         }
         .modal h2 { margin-top: 0; font-size: 20px; }
-        .modal p { color: #aaa; font-size: 14px; line-height: 1.4; }
+        .modal p { color: #aaa; font-size: 13px; line-height: 1.4; margin: 8px 0; }
+
+        /* QR CODE */
+        .qr-image {
+            width: 150px; height: 150px; object-fit: contain;
+            margin: 10px auto; display: block; border-radius: 8px;
+            background: #fff; padding: 6px;
+        }
 
         .whatsapp-box {
             background: #182c1e; border: 1px solid #35c759; color: #4cd964;
-            padding: 12px; border-radius: 8px; font-weight: bold; font-size: 16px; margin: 15px 0;
-            letter-spacing: 0.5px;
+            padding: 10px; border-radius: 8px; font-weight: bold; font-size: 15px; margin: 8px 0;
+        }
+
+        .time-notice {
+            background: #2b1d05; border: 1px solid #ff9f0a; color: #ffbe53;
+            font-size: 12px; padding: 10px; border-radius: 8px; margin: 12px 0; line-height: 1.4;
+            text-align: center; font-weight: bold;
         }
 
         .pin-input {
             width: 180px; letter-spacing: 6px; text-align: center; font-size: 24px;
             font-weight: bold; padding: 10px; border-radius: 8px; border: 2px solid var(--primary);
-            background: #000; color: #fff; margin: 15px auto; display: block; outline: none;
+            background: #000; color: #fff; margin: 12px auto; display: block; outline: none;
         }
 
-        .modal-buttons { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
+        .modal-buttons { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
         .btn-sec {
             border: 0; border-radius: 6px; padding: 12px 18px; font-weight: bold;
             cursor: pointer; outline: none; color: white; background: #262626;
@@ -214,21 +221,24 @@
     </div>
 </main>
 
-<!-- MODAL DE PIN & WHATSAPP -->
+<!-- MODAL DE PIN & WHATSAPP COM QR CODE -->
 <div id="pin-overlay" class="overlay">
     <div class="modal">
         <h2>Acesso Protegido</h2>
-        <p>Para desbloquear a página de downloads deste jogo, solicite seu PIN de 6 dígitos via WhatsApp:</p>
+        <p>Aponte a câmera do seu celular para o QR Code abaixo para solicitar seu PIN de acesso:</p>
 
-        <div class="whatsapp-box" id="whatsapp-display">
+        <a href="https://w.app/rdilgq" target="_blank">
+            <img class="qr-image" src="/qr.png" alt="QR Code WhatsApp" onerror="this.style.display='none';">
+        </a>
+
+        <div class="whatsapp-box">
             WhatsApp: (64) 99225-9727
         </div>
 
-        <button id="btn-req-pin" class="btn-sec btn-sec-primary" type="button" style="width: 100%;">
-            SOLICITAR PIN NO SERVIDOR
-        </button>
+        <div class="time-notice">
+            ⏳ <strong>Aviso:</strong> Após a emissão do PIN, você tem <strong>10 minutos</strong> para iniciar o download. Após esse prazo, o PIN se torna inválido.
+        </div>
 
-        <p style="margin-top: 15px; font-size: 12px; color: #888;">Após receber seu código, digite abaixo:</p>
         <input id="pin-input" class="pin-input" type="tel" maxlength="6" placeholder="000000" autocomplete="off">
 
         <div class="modal-buttons">
@@ -249,8 +259,6 @@
 
 <script>
 "use strict";
-
-const WHATSAPP_CONTATO = "(64) 99225-9727";
 
 let allPackages = [];
 let games = [];
@@ -399,7 +407,6 @@ function renderCatalog() {
 function openPinModal(game) {
     selectedGame = game;
     document.getElementById("pin-input").value = "";
-    document.getElementById("whatsapp-display").textContent = "WhatsApp: " + WHATSAPP_CONTATO;
     document.getElementById("pin-overlay").classList.add("visible");
     document.getElementById("pin-input").focus();
 }
@@ -408,34 +415,10 @@ function closePinModal() {
     document.getElementById("pin-overlay").classList.remove("visible");
 }
 
-async function requestPinOnServer() {
-    if (!selectedGame) return;
-    const btn = document.getElementById("btn-req-pin");
-    btn.disabled = true;
-    btn.textContent = "SOLICITANDO...";
-
-    try {
-        const res = await fetch("/api/request-pin", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title: selectedGame.title, gameKey: selectedGame.key })
-        });
-        const data = await res.json();
-        if (data.success) {
-            showNotice("✓ Solicitação registrada no servidor! Entre em contato no WhatsApp para obter seu PIN.", "success");
-            btn.textContent = "SOLICITAÇÃO ENVIADA!";
-        }
-    } catch (_) {
-        showNotice("Falha ao registrar solicitação no servidor.", "error");
-        btn.disabled = false;
-        btn.textContent = "SOLICITAR PIN NO SERVIDOR";
-    }
-}
-
 async function verifyPin() {
     const pin = document.getElementById("pin-input").value.trim();
     if (pin.length !== 6) {
-        showNotice("Digite um PIN de 6 dígitos.", "error");
+        showNotice("Digite o PIN de 6 dígitos recebido no WhatsApp.", "error");
         return;
     }
 
@@ -450,7 +433,7 @@ async function verifyPin() {
             closePinModal();
             showGameDetails(selectedGame);
         } else {
-            showNotice(data.message || "PIN incorreto ou não liberado.", "error");
+            showNotice(data.message || "PIN inválido ou expirado.", "error");
         }
     } catch (_) {
         showNotice("Erro ao validar PIN com o servidor.", "error");
@@ -505,7 +488,7 @@ function backToCatalog() {
 
 async function triggerInstall(pkg, button) {
     if (!isServerOnline) {
-        showNotice("Servidor Offline! Verifique a conexão do aplicativo.", "error");
+        showNotice("Servidor Offline! Verifique o app no celular.", "error");
         return;
     }
     button.disabled = true;
@@ -522,7 +505,7 @@ async function triggerInstall(pkg, button) {
         const data = await res.json();
         if (data.success) {
             button.textContent = "DOWNLOAD INICIADO!";
-            showNotice("✓ Instalação iniciada! Verifique a tela de notificações do PS4.", "success");
+            showNotice("✓ Instalação iniciada! Verifique as notificações do PS4.", "success");
         } else {
             button.textContent = "FALHA";
             showNotice("✗ " + (data.error || "Erro ao iniciar instalação."), "error");
@@ -579,7 +562,6 @@ document.getElementById("refresh").addEventListener("click", () => { checkStatus
 document.getElementById("btn-back").addEventListener("click", backToCatalog);
 document.getElementById("btn-cancel-pin").addEventListener("click", closePinModal);
 document.getElementById("btn-confirm-pin").addEventListener("click", verifyPin);
-document.getElementById("btn-req-pin").addEventListener("click", requestPinOnServer);
 document.getElementById("dlc-close").addEventListener("click", () => document.getElementById("dlc-overlay").classList.remove("visible"));
 
 document.addEventListener("DOMContentLoaded", async () => {
