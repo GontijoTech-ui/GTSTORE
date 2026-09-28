@@ -22,23 +22,23 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.StandardCharsets
 import java.util.Collections
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
-const val PIN_TIMEOUT_MS = 10 * 60 * 1000L // 10 minutos de validade
-
 data class PinRequest(
-    val id: Long,
-    val gameTitle: String,
-    val gameKey: String,
-    val pin: String,
-    val clientIp: String,
+    val id: Long = System.currentTimeMillis(),
+    val gameTitle: String = "Jogo",
+    val gameKey: String = "ALL",
+    val pin: String = "",
+    val clientIp: String = "",
     val createdAt: Long = System.currentTimeMillis()
 ) {
     val isExpired: Boolean
-        get() = (System.currentTimeMillis() - createdAt) > PIN_TIMEOUT_MS
+        get() = (System.currentTimeMillis() - createdAt) > HttpServer.PIN_TIMEOUT_MS
 }
+
+// Compatibilidade de tipo
+typealias PinEntry = PinRequest
 
 class HttpServer(
     private val context: Context,
@@ -46,6 +46,7 @@ class HttpServer(
 ) {
 
     companion object {
+        const val PIN_TIMEOUT_MS = 10 * 60 * 1000L // 10 minutos de validade
         private const val BUFFER_SIZE = 64 * 1024
         private const val MAX_HEADER_SIZE = 64 * 1024
         private const val MAX_POST_SIZE = 1024 * 1024
@@ -68,7 +69,6 @@ class HttpServer(
     private val activeConnections = AtomicInteger(0)
     private val logLines = Collections.synchronizedList(ArrayList<String>())
 
-    // Lista de solicitações de PIN ativas (exclusivas por jogo)
     private val pinRequests = Collections.synchronizedList(ArrayList<PinRequest>())
 
     fun getPinRequests(): List<PinRequest> {
@@ -77,6 +77,9 @@ class HttpServer(
             return ArrayList(pinRequests)
         }
     }
+
+    // Compatibilidade com código anterior
+    fun getActivePinsList(): List<PinRequest> = getPinRequests()
 
     fun createPinForGame(gameTitle: String, gameKey: String, clientIp: String = ""): PinRequest {
         val pin = (100000..999999).random().toString()
@@ -95,6 +98,8 @@ class HttpServer(
         dbg("PIN gerado para $gameTitle ($gameKey): $pin")
         return req
     }
+
+    fun generateAdminPin(): String = createPinForGame("Acesso Geral", "ALL").pin
 
     private fun dbg(msg: String) {
         val time = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(java.util.Date())
@@ -282,7 +287,6 @@ class HttpServer(
         }
     }
 
-    // 3 & 4: RECEBE A SOLICITAÇÃO DO PS4 E CRIA O PIN EXCLUSIVO PARA O CONTEÚDO
     private fun handlePinRequest(body: ByteArray, output: OutputStream, clientIp: String) {
         try {
             val json = JSONObject(String(body, StandardCharsets.UTF_8))
@@ -301,7 +305,6 @@ class HttpServer(
         }
     }
 
-    // 4: VALIDAÇÃO RIGOROSA: PIN SÓ É VÁLIDO SE BATER COM O CONTEÚDO ACESSADO
     private fun handleVerifyPin(body: ByteArray, output: OutputStream) {
         try {
             val json = JSONObject(String(body, StandardCharsets.UTF_8))
@@ -324,8 +327,8 @@ class HttpServer(
                 return
             }
 
-            // Exclusividade do conteúdo
-            if (!matching.gameKey.equals(gameKey, ignoreCase = true)) {
+            if (!matching.gameKey.equals("ALL", ignoreCase = true) &&
+                !matching.gameKey.equals(gameKey, ignoreCase = true)) {
                 sendJson(
                     output,
                     200,
@@ -670,7 +673,7 @@ class HttpServer(
     private var pkgCache: List<PackageInfo> = emptyList()
     @Volatile
     private var pkgCacheAt = 0L
-    private val metaCache = ConcurrentHashMap<String, PkgMetaReader.Meta>()
+    private val metaCache = java.util.concurrent.ConcurrentHashMap<String, PkgMetaReader.Meta>()
 
     private fun getPackages(force: Boolean = false): List<PackageInfo> {
         if (!force && pkgCache.isNotEmpty() && System.currentTimeMillis() - pkgCacheAt < PKG_CACHE_MS) return pkgCache
