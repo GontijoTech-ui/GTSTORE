@@ -26,6 +26,16 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
+const val PIN_TIMEOUT_MS = 10 * 60 * 1000L // 10 minutos de validade
+
+data class PinEntry(
+    val pin: String,
+    val createdAt: Long = System.currentTimeMillis()
+) {
+    val isExpired: Boolean
+        get() = (System.currentTimeMillis() - createdAt) > PIN_TIMEOUT_MS
+}
+
 class HttpServer(
     private val context: Context,
     private val port: Int = 8080
@@ -41,7 +51,7 @@ class HttpServer(
         private const val PKG_CACHE_MS = 15_000L
         private const val ZERO_DIGEST =
             "0000000000000000000000000000000000000000000000000000000000000000"
-        private const val MASTER_PIN = "888888" // PIN mestre de segurança do administrador
+        private const val MASTER_PIN = "888888"
     }
 
     private var serverSocket: ServerSocket? = null
@@ -54,19 +64,19 @@ class HttpServer(
     private val activeConnections = AtomicInteger(0)
     private val logLines = Collections.synchronizedList(ArrayList<String>())
 
-    // Gerenciador de PINs e Solicitações
-    data class PinRequest(
-        val id: Long,
-        val clientIp: String,
-        val gameTitle: String,
-        val gameKey: String,
-        val time: String,
-        var pin: String? = null,
-        var approved: Boolean = false
-    )
+    private val generatedPins = ConcurrentHashMap<String, PinEntry>()
 
-    private val pinRequests = Collections.synchronizedList(ArrayList<PinRequest>())
-    private val approvedPins = ConcurrentHashMap<String, String>() // PIN -> gameKey
+    fun generateAdminPin(): String {
+        val pin = (100000..999999).random().toString()
+        generatedPins[pin] = PinEntry(pin)
+        dbg("PIN de 10 min gerado pelo Admin: $pin")
+        return pin
+    }
+
+    fun getActivePinsList(): List<PinEntry> {
+        generatedPins.entries.removeIf { (System.currentTimeMillis() - it.value.createdAt) > 60 * 60 * 1000L }
+        return generatedPins.values.toList().sortedByDescending { it.createdAt }
+    }
 
     private fun dbg(msg: String) {
         val time = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(java.util.Date())
@@ -86,8 +96,7 @@ class HttpServer(
         val port: Int,
         val localAddress: String,
         val url: String,
-        val activeConnections: Int,
-        val pendingRequests: Int
+        val activeConnections: Int
     )
 
     data class PackageInfo(
@@ -146,20 +155,17 @@ class HttpServer(
 
     fun getStatus(): ServerStatus {
         val address = localAddress
-        val pendingCount = synchronized(pinRequests) { pinRequests.count { !it.approved } }
         return ServerStatus(
             running = running,
             port = port,
             localAddress = address,
             url = "http://$address:$port",
-            activeConnections = activeConnections.get(),
-            pendingRequests = pendingCount
+            activeConnections = activeConnections.get()
         )
     }
 
     private fun handleClient(socket: Socket) {
         activeConnections.incrementAndGet()
-
         val clientIp = (socket.remoteSocketAddress as? InetSocketAddress)?.address?.hostAddress ?: ""
 
         socket.use { client ->
@@ -174,7 +180,7 @@ class HttpServer(
 
                 val requestLine = input.readLine() ?: return
                 if (requestLine.length > MAX_HEADER_SIZE) {
-                    sendError(output, 431, "Request Header Fields Too Large")
+                    sendError(output, 431, "Header Too Large")
                     return
                 }
 
@@ -193,19 +199,17 @@ class HttpServer(
                     if (line.isEmpty()) break
                     val separator = line.indexOf(':')
                     if (separator > 0) {
-                        val name = line.substring(0, separator).trim().lowercase()
-                        val value = line.substring(separator + 1).trim()
-                        headers[name] = value
+                        headers[line.substring(0, separator).trim().lowercase()] = line.substring(separator + 1).trim()
                     }
                 }
 
-                if (!target.startsWith("/api/log") && !target.startsWith("/api/pin-requests")) {
+                if (!target.startsWith("/api/log")) {
                     dbg("$clientIp $method $target")
                 }
 
                 val contentLength = headers["content-length"]?.toIntOrNull() ?: 0
                 if (contentLength < 0 || contentLength > MAX_POST_SIZE) {
-                    sendError(output, 413, "Request Entity Too Large")
+                    sendError(output, 413, "Entity Too Large")
                     return
                 }
 
@@ -234,11 +238,8 @@ class HttpServer(
                 dbg("erro em $target: $e")
                 try {
                     val out = client.getOutputStream()
-                    if (target.startsWith("/api/")) {
-                        sendJsonError(out, 500, "Erro interno.")
-                    } else {
-                        sendError(out, 500, "Internal Server Error")
-                    }
+                    if (target.startsWith("/api/")) sendJsonError(out, 500, "Erro interno.")
+                    else sendError(out, 500, "Internal Server Error")
                 } catch (_: Exception) {
                 }
             } finally {
@@ -255,70 +256,10 @@ class HttpServer(
         clientIp: String
     ) {
         val uri = Uri.parse(target)
-        val path = uri.path ?: "/"
-
-        when (path) {
+        when (uri.path ?: "/") {
             "/api/install-dpi" -> handleDirectInstallDpi(body, headers, output, clientIp)
-            "/api/request-pin" -> handlePinRequest(body, output, clientIp)
             "/api/verify-pin" -> handleVerifyPin(body, output)
-            "/api/generate-pin" -> handleGeneratePin(body, output)
             else -> sendJsonError(output, 404, "Endpoint não encontrado")
-        }
-    }
-
-    // ============================================================
-    // GESTÃO DE PIN & SOLICITAÇÕES
-    // ============================================================
-
-    private fun handlePinRequest(body: ByteArray, output: OutputStream, clientIp: String) {
-        try {
-            val json = JSONObject(String(body, StandardCharsets.UTF_8))
-            val title = json.optString("title", "Jogo")
-            val gameKey = json.optString("gameKey", "CUSA00000")
-
-            val time = java.text.SimpleDateFormat("HH:mm:ss - dd/MM", java.util.Locale.US).format(java.util.Date())
-            val reqId = System.currentTimeMillis()
-
-            val req = PinRequest(
-                id = reqId,
-                clientIp = clientIp,
-                gameTitle = title,
-                gameKey = gameKey,
-                time = time
-            )
-
-            synchronized(pinRequests) {
-                pinRequests.add(0, req)
-                while (pinRequests.size > 50) pinRequests.removeAt(pinRequests.size - 1)
-            }
-
-            dbg("Solicitação de PIN recebida de $clientIp para $title ($gameKey)")
-            sendJson(output, 200, JSONObject().put("success", true).put("requestId", reqId))
-        } catch (_: Exception) {
-            sendJsonError(output, 400, "Dados inválidos.")
-        }
-    }
-
-    private fun handleGeneratePin(body: ByteArray, output: OutputStream) {
-        try {
-            val json = JSONObject(String(body, StandardCharsets.UTF_8))
-            val reqId = json.optLong("requestId", -1L)
-
-            val req = synchronized(pinRequests) { pinRequests.firstOrNull { it.id == reqId } }
-            if (req == null) {
-                sendJsonError(output, 404, "Solicitação não encontrada.")
-                return
-            }
-
-            val pin = (100000..999999).random().toString()
-            req.pin = pin
-            req.approved = true
-            approvedPins[pin] = req.gameKey
-
-            dbg("PIN gerado para ${req.gameTitle}: $pin")
-            sendJson(output, 200, JSONObject().put("success", true).put("pin", pin))
-        } catch (_: Exception) {
-            sendJsonError(output, 400, "Erro ao gerar PIN.")
         }
     }
 
@@ -326,40 +267,29 @@ class HttpServer(
         try {
             val json = JSONObject(String(body, StandardCharsets.UTF_8))
             val pin = json.optString("pin").trim()
-            val gameKey = json.optString("gameKey").trim().uppercase()
 
-            if (pin == MASTER_PIN || (approvedPins.containsKey(pin) && (approvedPins[pin] == gameKey || approvedPins[pin] == "ALL"))) {
+            if (pin == MASTER_PIN) {
                 sendJson(output, 200, JSONObject().put("valid", true))
-            } else {
-                sendJson(output, 200, JSONObject().put("valid", false).put("message", "PIN incorreto ou não liberado."))
+                return
             }
+
+            val entry = generatedPins[pin]
+            if (entry == null) {
+                sendJson(output, 200, JSONObject().put("valid", false).put("message", "PIN inválido ou incorreto."))
+                return
+            }
+
+            if (entry.isExpired) {
+                generatedPins.remove(pin)
+                sendJson(output, 200, JSONObject().put("valid", false).put("message", "Este PIN expirou! O prazo de 10 minutos foi encerrado."))
+                return
+            }
+
+            sendJson(output, 200, JSONObject().put("valid", true))
         } catch (_: Exception) {
             sendJsonError(output, 400, "Erro ao validar PIN.")
         }
     }
-
-    private fun sendPinRequestsJson(output: OutputStream) {
-        val array = JSONArray()
-        synchronized(pinRequests) {
-            for (req in pinRequests) {
-                array.put(
-                    JSONObject()
-                        .put("id", req.id)
-                        .put("ip", req.clientIp)
-                        .put("title", req.gameTitle)
-                        .put("gameKey", req.gameKey)
-                        .put("time", req.time)
-                        .put("pin", req.pin ?: "")
-                        .put("approved", req.approved)
-                )
-            }
-        }
-        sendJson(output, 200, JSONObject().put("requests", array))
-    }
-
-    // ============================================================
-    // INSTALAÇÃO DIRETA (DPI)
-    // ============================================================
 
     private fun handleDirectInstallDpi(
         body: ByteArray,
@@ -423,7 +353,7 @@ class HttpServer(
 
                     val binResult = sendPayloadToBinLoader(ps4Ip, payload)
                     if (!binResult.success) {
-                        sendJsonError(output, 502, "Falha ao acionar BinLoader (9090).")
+                        sendJsonError(output, 502, "Falha ao conectar no BinLoader (9090).")
                         return
                     }
 
@@ -434,7 +364,7 @@ class HttpServer(
                                 flush()
                             }
                         }
-                        dbg("DPI: Download disparado para ${packageInfo.fileName}")
+                        dbg("DPI: instalação iniciada para ${packageInfo.fileName}")
                         sendJson(output, 200, JSONObject().put("success", true).put("message", "Instalação iniciada!"))
                     } catch (_: Exception) {
                         sendJsonError(output, 504, "Tempo esgotado aguardando o PS4.")
@@ -556,9 +486,8 @@ class HttpServer(
 
         when {
             path == "/" || path == "/ps4" -> sendHomePage(output, headOnly)
-            path == "/admin" -> sendAdminPage(output, headOnly)
-            path == "/api/pin-requests" -> sendPinRequestsJson(output)
-            path == "/logo.jpg" -> sendLogo(output, headOnly)
+            path == "/logo.jpg" -> sendAssetFile("logo.jpg", "image/jpeg", output, headOnly)
+            path == "/qr.png" -> sendAssetFile("qr.png", "image/png", output, headOnly)
             path == "/api/status" -> sendStatusJson(output, headOnly, clientIp)
             path == "/api/packages" -> sendPackagesJson(output, headOnly)
             path.startsWith("/api/package-icon/") -> {
@@ -586,13 +515,13 @@ class HttpServer(
         }
     }
 
-    private fun sendLogo(output: OutputStream, headOnly: Boolean) {
+    private fun sendAssetFile(fileName: String, mimeType: String, output: OutputStream, headOnly: Boolean) {
         try {
-            context.assets.open("logo.jpg").use { input ->
-                sendResponse(output, 200, "OK", "image/jpeg", input.readBytes(), headOnly)
+            context.assets.open(fileName).use { input ->
+                sendResponse(output, 200, "OK", mimeType, input.readBytes(), headOnly)
             }
         } catch (_: Exception) {
-            sendError(output, 404, "logo.jpg não encontrado.")
+            sendError(output, 404, "$fileName não encontrado na pasta assets.")
         }
     }
 
@@ -790,7 +719,6 @@ class HttpServer(
             .put("online", status.running)
             .put("port", status.port)
             .put("localAddress", status.localAddress)
-            .put("pendingRequests", status.pendingRequests)
             .put("clientIp", clientIp)
 
         val body = json.toString().toByteArray(StandardCharsets.UTF_8)
@@ -805,69 +733,6 @@ class HttpServer(
         } catch (_: Exception) {
             sendError(output, 404, "index.html não encontrado.")
         }
-    }
-
-    // Painel de Solicitações do Administrador (/admin)
-    private fun sendAdminPage(output: OutputStream, headOnly: Boolean) {
-        val html = """
-            <!DOCTYPE html>
-            <html lang="pt-BR">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>GTSTORE - Painel de Solicitações</title>
-                <style>
-                    body { background: #000; color: #fff; font-family: sans-serif; padding: 20px; margin: 0; }
-                    h1 { font-size: 20px; border-bottom: 1px solid #333; padding-bottom: 10px; }
-                    .card { background: #121212; border: 1px solid #222; border-radius: 8px; padding: 15px; margin-bottom: 12px; }
-                    .title { font-size: 16px; font-weight: bold; color: #0088f0; margin: 0 0 5px; }
-                    .meta { font-size: 12px; color: #888; margin-bottom: 10px; }
-                    .pin-box { font-size: 22px; font-weight: bold; color: #35c759; margin: 8px 0; letter-spacing: 2px; }
-                    button { background: #0070cc; color: white; border: 0; padding: 10px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; }
-                    button:active { opacity: 0.8; }
-                </style>
-            </head>
-            <body>
-                <h1>Solicitações de PIN (PS4)</h1>
-                <div id="list">Carregando solicitações...</div>
-                <script>
-                    async function load() {
-                        try {
-                            const res = await fetch('/api/pin-requests');
-                            const data = await res.json();
-                            const container = document.getElementById('list');
-                            if(!data.requests.length) {
-                                container.innerHTML = '<p style="color:#777">Nenhuma solicitação no momento.</p>';
-                                return;
-                            }
-                            container.innerHTML = data.requests.map(r => `
-                                <div class="card">
-                                    <div class="title">${"$"}{r.title}</div>
-                                    <div class="meta">${"$"}{r.gameKey} • IP: ${"$"}{r.ip} • Horário: ${"$"}{r.time}</div>
-                                    ${"$"}{r.approved ? `
-                                        <div>PIN Gerado: <span class="pin-box">${"$"}{r.pin}</span></div>
-                                    ` : `
-                                        <button onclick="genPin(${"$"}{r.id})">GERAR PIN (6 DÍGITOS)</button>
-                                    `}
-                                </div>
-                            `).join('');
-                        } catch(e) {}
-                    }
-                    async function genPin(id) {
-                        await fetch('/api/generate-pin', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({ requestId: id })
-                        });
-                        load();
-                    }
-                    setInterval(load, 3000);
-                    load();
-                </script>
-            </body>
-            </html>
-        """.trimIndent()
-        sendResponse(output, 200, "OK", "text/html; charset=utf-8", html.toByteArray(StandardCharsets.UTF_8), headOnly)
     }
 
     private fun sendOptions(output: OutputStream) {
@@ -920,18 +785,6 @@ class HttpServer(
         } catch (_: Exception) {
             null
         }
-    }
-
-    private fun formatFileSize(bytes: Long): String {
-        if (bytes <= 0) return "0 B"
-        val units = arrayOf("B", "KB", "MB", "GB", "TB")
-        var value = bytes.toDouble()
-        var index = 0
-        while (value >= 1024 && index < units.lastIndex) {
-            value /= 1024
-            index++
-        }
-        return String.format(java.util.Locale.US, "%.2f %s", value, units[index])
     }
 
     private fun sanitizeFileName(name: String): String = name.replace("\"", "").replace("\r", "").replace("\n", "_")
