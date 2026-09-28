@@ -143,9 +143,9 @@
         .modal p { color: #aaa; font-size: 13px; line-height: 1.4; margin: 8px 0; }
 
         .qr-image {
-            width: 150px; height: 150px; object-fit: contain;
-            margin: 10px auto; display: block; border-radius: 8px;
-            background: #fff; padding: 6px;
+            width: 145px; height: 145px; object-fit: contain;
+            margin: 6px auto; display: block; border-radius: 8px;
+            background: #fff; padding: 5px;
         }
 
         .whatsapp-box {
@@ -155,7 +155,7 @@
 
         .time-notice {
             background: #2b1d05; border: 1px solid #ff9f0a; color: #ffbe53;
-            font-size: 12px; padding: 10px; border-radius: 8px; margin: 12px 0; line-height: 1.4;
+            font-size: 12px; padding: 10px; border-radius: 8px; margin: 10px 0; line-height: 1.4;
             text-align: center; font-weight: bold;
         }
 
@@ -218,10 +218,21 @@
     </div>
 </main>
 
+<!-- MODAL DE PIN & WHATSAPP COM SOLICITAÇÃO -->
 <div id="pin-overlay" class="overlay">
     <div class="modal">
         <h2>Acesso Protegido</h2>
-        <p>Aponte a câmara do telemóvel para o QR Code abaixo para solicitar o seu PIN de acesso:</p>
+        <p id="pin-modal-game-info" style="color: #0088f0; font-weight: bold; margin-bottom: 12px;"></p>
+
+        <!-- 1: BOTÃO DE SOLICITAR PIN DE VOLTA -->
+        <button id="btn-req-pin" class="btn-sec btn-sec-primary" type="button" style="width: 100%; margin-bottom: 12px;">
+            SOLICITAR PIN
+        </button>
+
+        <!-- 2: MENSAGEM ANTES DO QR CODE -->
+        <p style="font-weight: bold; color: #35c759; margin: 10px 0 6px; font-size: 14px;">
+            Chame no WhatsApp após solicitar o PIN:
+        </p>
 
         <a href="https://w.app/rdilgq" target="_blank">
             <img class="qr-image" src="/qr.png" alt="QR Code WhatsApp" onerror="this.style.display='none';">
@@ -401,13 +412,45 @@ function renderCatalog() {
 
 function openPinModal(game) {
     selectedGame = game;
+    document.getElementById("pin-modal-game-info").textContent = game.title + " (" + game.key + ")";
     document.getElementById("pin-input").value = "";
+    const btnReq = document.getElementById("btn-req-pin");
+    btnReq.disabled = false;
+    btnReq.textContent = "SOLICITAR PIN";
     document.getElementById("pin-overlay").classList.add("visible");
     document.getElementById("pin-input").focus();
 }
 
 function closePinModal() {
     document.getElementById("pin-overlay").classList.remove("visible");
+}
+
+async function requestPin() {
+    if (!selectedGame) return;
+    const btn = document.getElementById("btn-req-pin");
+    btn.disabled = true;
+    btn.textContent = "SOLICITANDO...";
+
+    try {
+        const res = await fetch("/api/request-pin", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: selectedGame.title, gameKey: selectedGame.key })
+        });
+        const data = await res.json();
+        if (data.success) {
+            btn.textContent = "✓ SOLICITAÇÃO ENVIADA!";
+            showNotice("✓ Solicitação enviada! Chame no WhatsApp para receber seu PIN.", "success");
+        } else {
+            btn.disabled = false;
+            btn.textContent = "SOLICITAR PIN";
+            showNotice("Falha ao registrar solicitação no servidor.", "error");
+        }
+    } catch (_) {
+        btn.disabled = false;
+        btn.textContent = "SOLICITAR PIN";
+        showNotice("Erro ao comunicar com o servidor.", "error");
+    }
 }
 
 async function verifyPin() {
@@ -428,7 +471,7 @@ async function verifyPin() {
             closePinModal();
             showGameDetails(selectedGame);
         } else {
-            showNotice(data.message || "PIN inválido ou expirado.", "error");
+            showNotice(data.message || "PIN inválido ou exclusivo para outro jogo.", "error");
         }
     } catch (_) {
         showNotice("Erro ao validar PIN com o servidor.", "error");
@@ -483,13 +526,13 @@ function backToCatalog() {
 
 async function triggerInstall(pkg, button) {
     if (!isServerOnline) {
-        showNotice("Servidor Offline! Verifique o app no telemóvel.", "error");
+        showNotice("Servidor Offline! Verifique o app no celular.", "error");
         return;
     }
     button.disabled = true;
     const original = button.textContent;
-    button.textContent = "A ENVIAR AO PS4...";
-    showNotice("A enviar payload para a porta 9090 da consola...");
+    button.textContent = "ENVIANDO AO PS4...";
+    showNotice("Enviando payload para a porta 9090 do console...");
 
     try {
         const res = await fetch("/api/install-dpi", {
@@ -500,7 +543,7 @@ async function triggerInstall(pkg, button) {
         const data = await res.json();
         if (data.success) {
             button.textContent = "DOWNLOAD INICIADO!";
-            showNotice("✓ Instalação iniciada! Verifique as notificações da PS4.", "success");
+            showNotice("✓ Instalação iniciada! Verifique as notificações do PS4.", "success");
         } else {
             button.textContent = "FALHA";
             showNotice("✗ " + (data.error || "Erro ao iniciar instalação."), "error");
@@ -555,6 +598,7 @@ async function loadPackages() {
 document.getElementById("search").addEventListener("input", renderCatalog);
 document.getElementById("refresh").addEventListener("click", () => { checkStatus(); loadPackages(); });
 document.getElementById("btn-back").addEventListener("click", backToCatalog);
+document.getElementById("btn-req-pin").addEventListener("click", requestPin);
 document.getElementById("btn-cancel-pin").addEventListener("click", closePinModal);
 document.getElementById("btn-confirm-pin").addEventListener("click", verifyPin);
 document.getElementById("dlc-close").addEventListener("click", () => document.getElementById("dlc-overlay").classList.remove("visible"));
