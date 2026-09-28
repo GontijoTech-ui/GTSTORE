@@ -2,369 +2,1654 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GTStore - PS4 Installer</title>
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>GTSTORE</title>
+
     <style>
         :root {
-            --bg-color: #121212;
-            --card-bg: #1e1e1e;
+            --bg: #0b0d10;
+            --panel: #15181d;
+            --panel-2: #1b1f25;
+            --border: #292e36;
             --primary: #0070cc;
-            --primary-hover: #005bb5;
-            --text-main: #ffffff;
-            --text-muted: #aaaaaa;
-            --danger: #e53935;
-            --success: #4caf50;
-            --warning: #ff9800;
+            --primary-hover: #0088f0;
+            --text: #ffffff;
+            --muted: #a8adb5;
+            --green: #35c759;
+            --orange: #ff9f0a;
+            --red: #ff453a;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100%;
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            background: var(--bg);
+            color: var(--text);
+            font-family:
+                Arial,
+                Helvetica,
+                sans-serif;
         }
 
-        header {
+        button {
+            font-family: inherit;
+        }
+
+        .header {
             width: 100%;
-            background-color: var(--card-bg);
-            padding: 20px 0;
+            background: #101318;
+            border-bottom: 1px solid var(--border);
+            padding: 18px 14px 20px;
             text-align: center;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            margin-bottom: 20px;
         }
 
-        header h1 {
+        .logo {
+            display: block;
+            width: 150px;
+            max-width: 60%;
+            height: auto;
+            max-height: 90px;
+            object-fit: contain;
+            margin: 0 auto 10px;
+            border-radius: 12px;
+        }
+
+        .brand {
             margin: 0;
-            font-size: 28px;
-            letter-spacing: 2px;
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: 3px;
+        }
+
+        .subtitle {
+            margin: 7px 0 0;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .server-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            margin-top: 12px;
+            padding: 7px 12px;
+            border-radius: 20px;
+            background: #20242a;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--orange);
+        }
+
+        .status-online .status-dot {
+            background: var(--green);
+        }
+
+        .status-offline .status-dot {
+            background: var(--red);
         }
 
         .container {
-            width: 90%;
-            max-width: 800px;
+            width: 94%;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px 0 50px;
         }
 
-        .config-panel {
-            background-color: var(--card-bg);
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-        }
-
-        .config-row {
+        .toolbar {
             display: flex;
             flex-wrap: wrap;
-            gap: 15px;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .input-group {
-            display: flex;
-            align-items: center;
             gap: 10px;
-            flex-grow: 1;
+            align-items: center;
+            margin-bottom: 20px;
         }
 
-        .input-group label {
-            font-weight: bold;
-            white-space: nowrap;
+        .search {
+            flex: 1;
+            min-width: 220px;
+            padding: 12px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--panel);
+            color: var(--text);
+            font-size: 15px;
+            outline: none;
         }
 
-        .input-group input {
-            padding: 10px;
-            border-radius: 5px;
-            border: 1px solid #333;
-            background-color: #2a2a2a;
-            color: white;
-            font-size: 16px;
-            flex-grow: 1;
+        .search:focus {
+            border-color: var(--primary);
         }
 
-        .status-badge {
-            padding: 8px 15px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: bold;
-            background-color: #333;
-            text-align: center;
-        }
-
-        .status-online { background-color: var(--success) !important; }
-        .status-offline { background-color: var(--danger) !important; }
-        .status-scanning { background-color: var(--warning) !important; color: #000; }
-
-        .btn-scan {
-            background-color: #444;
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            border-radius: 5px;
+        .refresh {
+            border: 0;
+            border-radius: 8px;
+            padding: 12px 16px;
+            background: var(--panel-2);
+            color: var(--text);
             cursor: pointer;
-            font-weight: bold;
-            transition: background 0.2s;
+            font-weight: 700;
         }
 
-        .btn-scan:hover { background-color: #555; }
+        .refresh:hover {
+            background: #252a31;
+        }
 
-        .pkg-list {
+        .catalog {
             display: flex;
             flex-direction: column;
-            gap: 15px;
-            margin-bottom: 40px;
+            gap: 16px;
         }
 
-        .pkg-card {
-            background-color: var(--card-bg);
-            padding: 20px;
-            border-radius: 10px;
+        .game-card {
             display: flex;
-            justify-content: space-between;
+            gap: 18px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+        }
+
+        .cover-wrap {
+            flex: 0 0 150px;
+            width: 150px;
+        }
+
+        .cover {
+            display: block;
+            width: 150px;
+            height: 150px;
+            object-fit: contain;
+            border-radius: 9px;
+            background: #0a0c0f;
+        }
+
+        .cover-placeholder {
+            width: 150px;
+            height: 150px;
+            border-radius: 9px;
+            background: #20242a;
+            display: flex;
             align-items: center;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-            transition: transform 0.2s;
+            justify-content: center;
+            color: #777d86;
+            font-size: 12px;
+            text-align: center;
+            padding: 10px;
         }
 
-        .pkg-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 15px rgba(0,0,0,0.5);
+        .game-content {
+            flex: 1;
+            min-width: 0;
         }
 
-        .pkg-info h3 {
-            margin: 0 0 5px 0;
-            font-size: 18px;
+        .game-title {
+            margin: 2px 0 7px;
+            font-size: 21px;
+            line-height: 1.25;
+            word-break: break-word;
         }
 
-        .pkg-info p {
-            margin: 0;
-            color: var(--text-muted);
-            font-size: 14px;
+        .game-id {
+            margin: 0 0 14px;
+            color: var(--muted);
+            font-size: 12px;
+            word-break: break-all;
         }
 
-        .btn {
-            background-color: var(--primary);
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .action {
+            border: 0;
+            border-radius: 7px;
+            padding: 11px 16px;
+            min-width: 100px;
+            background: var(--primary);
             color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            font-size: 16px;
+            font-size: 14px;
+            font-weight: 800;
             cursor: pointer;
-            font-weight: bold;
-            transition: background-color 0.2s;
-            white-space: nowrap;
         }
 
-        .btn:hover { background-color: var(--primary-hover); }
-        .btn:disabled { background-color: #555; cursor: not-allowed; }
+        .action:hover {
+            background: var(--primary-hover);
+        }
+
+        .action:disabled {
+            opacity: 0.5;
+            cursor: default;
+        }
+
+        .action-update {
+            background: #355f8c;
+        }
+
+        .action-dlc {
+            background: #7047a3;
+        }
+
+        .action-patch {
+            background: #99651f;
+        }
+
+        .package-info {
+            margin-top: 13px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .empty,
+        .loading,
+        .error {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 28px 18px;
+            text-align: center;
+            color: var(--muted);
+        }
+
+        .error {
+            color: #ff817a;
+        }
+
+        .footer {
+            padding: 30px 10px;
+            text-align: center;
+            color: #676d76;
+            font-size: 11px;
+        }
+
+        .overlay {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.82);
+            z-index: 1000;
+        }
+
+        .overlay.visible {
+            display: flex;
+        }
+
+        .modal {
+            width: 100%;
+            max-width: 700px;
+            max-height: 90vh;
+            overflow: auto;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 18px;
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .modal-title {
+            margin: 0;
+            font-size: 21px;
+        }
+
+        .close {
+            border: 0;
+            background: #292e35;
+            color: white;
+            width: 38px;
+            height: 38px;
+            border-radius: 7px;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .dlc-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .dlc-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            background: var(--panel-2);
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            padding: 12px;
+        }
+
+        .dlc-name {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .dlc-title {
+            margin: 0 0 5px;
+            font-size: 15px;
+            word-break: break-word;
+        }
+
+        .dlc-meta {
+            margin: 0;
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .send-button {
+            flex-shrink: 0;
+            border: 0;
+            border-radius: 7px;
+            background: var(--primary);
+            color: white;
+            padding: 10px 14px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .send-button:hover {
+            background: var(--primary-hover);
+        }
+
+        .send-button:disabled {
+            opacity: 0.5;
+        }
+
+        .notice {
+            display: none;
+            margin-bottom: 15px;
+            padding: 12px 14px;
+            border-radius: 8px;
+            background: #252a31;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .notice.visible {
+            display: block;
+        }
+
+        @media (max-width: 620px) {
+            .game-card {
+                flex-direction: column;
+            }
+
+            .cover-wrap {
+                width: 100%;
+                flex-basis: auto;
+                display: flex;
+                justify-content: center;
+            }
+
+            .game-title {
+                text-align: center;
+            }
+
+            .game-id {
+                text-align: center;
+            }
+
+            .actions {
+                justify-content: center;
+            }
+
+            .package-info {
+                text-align: center;
+            }
+        }
     </style>
 </head>
+
 <body>
 
-    <header>
-        <h1>GTSTORE</h1>
-    </header>
+<header class="header">
 
-    <div class="container">
-        <div class="config-panel">
-            <div class="config-row">
-                <div class="input-group">
-                    <label for="ps4-ip">IP do PS4:</label>
-                    <input type="text" id="ps4-ip" placeholder="A detetar automaticamente...">
-                </div>
-                <button class="btn-scan" onclick="autoDetectPs4Ip()">🔍 Procurar IP</button>
-            </div>
-            <div id="status-indicator" class="status-badge">A verificar servidor Android...</div>
-        </div>
+    <img
+        class="logo"
+        src="/logo.jpg"
+        alt="GTSTORE"
+        onerror="this.style.display='none';"
+    >
 
-        <div id="pkg-container" class="pkg-list">
-            <p style="text-align: center; color: #aaa;">A carregar pacotes...</p>
-        </div>
+    <h1 class="brand">GTSTORE</h1>
+
+    <p class="subtitle">
+        PS4 PKG Store
+    </p>
+
+    <div
+        id="server-status"
+        class="server-status"
+    >
+        <span class="status-dot"></span>
+        <span id="server-status-text">
+            A verificar servidor...
+        </span>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // 1. Recupera IP guardado anteriormente
-            const savedIp = localStorage.getItem('gtstore_ps4_ip');
-            if (savedIp) {
-                document.getElementById('ps4-ip').value = savedIp;
-            } else {
-                autoDetectPs4Ip(); // Tenta detetar ao abrir se não houver salvo
-            }
+</header>
 
-            checkStatus();
-            loadPackages();
-        });
+<main class="container">
 
-        async function checkStatus() {
-            const indicator = document.getElementById('status-indicator');
-            try {
-                const res = await fetch('/api/status');
-                const data = await res.json();
-                if (data.online) {
-                    indicator.textContent = 'Servidor Android Online (' + data.localAddress + ':' + data.port + ')';
-                    indicator.className = 'status-badge status-online';
-                }
-            } catch (e) {
-                indicator.textContent = 'Servidor Android Offline';
-                indicator.className = 'status-badge status-offline';
+    <div class="toolbar">
+
+        <input
+            id="search"
+            class="search"
+            type="search"
+            placeholder="Pesquisar jogo..."
+            autocomplete="off"
+        >
+
+        <button
+            id="refresh"
+            class="refresh"
+            type="button"
+        >
+            Atualizar
+        </button>
+
+    </div>
+
+    <div
+        id="notice"
+        class="notice"
+    ></div>
+
+    <section
+        id="catalog"
+        class="catalog"
+    >
+        <div class="loading">
+            Carregando catálogo...
+        </div>
+    </section>
+
+</main>
+
+<footer class="footer">
+    GTSTORE
+</footer>
+
+<div
+    id="dlc-overlay"
+    class="overlay"
+>
+    <div class="modal">
+
+        <div class="modal-header">
+
+            <h2
+                id="dlc-modal-title"
+                class="modal-title"
+            >
+                DLC
+            </h2>
+
+            <button
+                id="dlc-close"
+                class="close"
+                type="button"
+            >
+                ×
+            </button>
+
+        </div>
+
+        <div
+            id="dlc-list"
+            class="dlc-list"
+        ></div>
+
+    </div>
+</div>
+
+<script>
+"use strict";
+
+/*
+ * Catálogo recebido do servidor.
+ */
+let allPackages = [];
+let games = [];
+
+/*
+ * Escapa texto antes de inseri-lo no HTML.
+ */
+function escapeHtml(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+/*
+ * Formatação do tamanho.
+ */
+function formatSize(bytes) {
+
+    const value = Number(bytes);
+
+    if (!Number.isFinite(value) || value < 0) {
+        return "Tamanho desconhecido";
+    }
+
+    if (value < 1024) {
+        return value + " B";
+    }
+
+    if (value < 1024 * 1024) {
+        return (value / 1024).toFixed(2) + " KB";
+    }
+
+    if (value < 1024 * 1024 * 1024) {
+        return (value / (1024 * 1024)).toFixed(2) + " MB";
+    }
+
+    return (value / (1024 * 1024 * 1024)).toFixed(2) + " GB";
+}
+
+/*
+ * Atualiza status do servidor.
+ */
+async function checkStatus() {
+
+    const badge = document.getElementById("server-status");
+    const text = document.getElementById("server-status-text");
+
+    try {
+
+        const response = await fetch(
+            "/api/status",
+            {
+                cache: "no-store"
             }
+        );
+
+        if (!response.ok) {
+            throw new Error("HTTP " + response.status);
         }
 
-        async function loadPackages() {
-            const container = document.getElementById('pkg-container');
-            try {
-                const res = await fetch('/api/packages');
-                const data = await res.json();
-                
-                container.innerHTML = '';
-                
-                if (data.count === 0) {
-                    container.innerHTML = '<p style="text-align: center; color: #aaa;">Nenhum PKG encontrado na pasta selecionada no Android.</p>';
-                    return;
-                }
+        const data = await response.json();
 
-                data.packages.forEach(pkg => {
-                    const card = document.createElement('div');
-                    card.className = 'pkg-card';
-                    card.innerHTML = `
-                        <div class="pkg-info">
-                            <h3>${pkg.name}</h3>
-                            <p>Tamanho: ${pkg.formattedSize}</p>
-                        </div>
-                        <button class="btn" id="btn-${pkg.id}" onclick="installDPI(${pkg.id})">Instalar no PS4</button>
-                    `;
-                    container.appendChild(card);
-                });
-            } catch (e) {
-                container.innerHTML = '<p style="text-align: center; color: #e53935;">Erro ao carregar a lista de pacotes.</p>';
-            }
+        badge.className = "server-status status-online";
+
+        text.textContent =
+            "Servidor online — " +
+            (data.local_address || "") +
+            ":" +
+            (data.port || "");
+
+    } catch (error) {
+
+        badge.className = "server-status status-offline";
+
+        text.textContent =
+            "Servidor indisponível";
+    }
+}
+
+/*
+ * Normaliza o tipo retornado pelo servidor.
+ *
+ * A classificação deve vir do metadata do PKG.
+ * Não utilizamos o nome do arquivo para isso.
+ */
+function normalizeType(pkg) {
+
+    const type =
+        String(
+            pkg.catalogType ||
+            pkg.type ||
+            ""
+        ).toUpperCase();
+
+    if (type === "GAME") {
+        return "GAME";
+    }
+
+    if (type === "UPDATE") {
+        return "UPDATE";
+    }
+
+    if (type === "DLC") {
+        return "DLC";
+    }
+
+    if (type === "PATCH") {
+        return "PATCH";
+    }
+
+    return "OTHER";
+}
+
+/*
+ * Obtém a chave de agrupamento.
+ *
+ * A preferência é CONTENT_ID.
+ * O servidor deve fornecer o valor derivado
+ * do metadata real do PKG.
+ */
+function groupKey(pkg) {
+
+    const contentId =
+        String(pkg.contentId || "")
+            .trim()
+            .toUpperCase();
+
+    if (contentId) {
+
+        const match =
+            contentId.match(/CUSA\d+/i);
+
+        if (match) {
+            return match[0].toUpperCase();
         }
 
-        // --- SISTEMA DE RECONHECIMENTO AUTOMÁTICO DO IP DO PS4 ---
-        async function autoDetectPs4Ip() {
-            const ipInput = document.getElementById('ps4-ip');
-            const indicator = document.getElementById('status-indicator');
-            
-            // Se o navegador foi aberto no próprio PS4, o IP do cliente é o do PS4!
-            try {
-                const res = await fetch('/api/status');
-                const data = await res.json();
-                if (data.clientIp && data.clientIp !== "127.0.0.1" && data.clientIp !== data.localAddress) {
-                    ipInput.value = data.clientIp;
-                    localStorage.setItem('gtstore_ps4_ip', data.clientIp);
-                    return;
+        const prefix =
+            contentId.split("_00-")[0];
+
+        if (prefix) {
+            return prefix;
+        }
+    }
+
+    /*
+     * Sem metadata não criamos uma identidade
+     * artificial baseada no nome do arquivo.
+     */
+    return null;
+}
+
+/*
+ * Escolhe a imagem de capa retornada pelo servidor.
+ */
+function packageIcon(pkg) {
+
+    if (pkg.iconUrl) {
+        return pkg.iconUrl;
+    }
+
+    if (pkg.icon) {
+
+        const icon =
+            String(pkg.icon);
+
+        if (icon.indexOf("data:") === 0) {
+            return icon;
+        }
+
+        return "data:image/png;base64," + icon;
+    }
+
+    return null;
+}
+
+/*
+ * Cria o catálogo agrupado.
+ */
+function buildCatalog(packages) {
+
+    const groups = new Map();
+
+    for (const pkg of packages) {
+
+        const type = normalizeType(pkg);
+
+        /*
+         * OTHER não entra no catálogo principal.
+         */
+        if (type === "OTHER") {
+            continue;
+        }
+
+        const key = groupKey(pkg);
+
+        if (!key) {
+            continue;
+        }
+
+        if (!groups.has(key)) {
+
+            groups.set(
+                key,
+                {
+                    key: key,
+                    title: "",
+                    cover: null,
+                    game: null,
+                    updates: [],
+                    dlcs: [],
+                    patches: []
                 }
-            } catch (e) {}
+            );
+        }
 
-            // Caso contrário, tenta descobrir o gateway/sub-rede com base no IP do telemóvel
-            indicator.textContent = 'A procurar PS4 na rede local...';
-            indicator.className = 'status-badge status-scanning';
+        const game =
+            groups.get(key);
 
-            try {
-                const statusRes = await fetch('/api/status');
-                const statusData = await statusRes.json();
-                const androidIp = statusData.localAddress; // Ex: 192.168.1.15
+        const title =
+            String(
+                pkg.title ||
+                pkg.name ||
+                ""
+            ).trim();
 
-                if (!androidIp || androidIp === '0.0.0.0') {
-                    indicator.className = 'status-badge status-online';
-                    return;
+        /*
+         * O título vem preferencialmente do metadata.
+         */
+        if (!game.title && title) {
+            game.title = title;
+        }
+
+        const icon =
+            packageIcon(pkg);
+
+        if (!game.cover && icon) {
+            game.cover = icon;
+        }
+
+        if (type === "GAME") {
+
+            if (!game.game) {
+                game.game = pkg;
+            }
+
+        } else if (type === "UPDATE") {
+
+            game.updates.push(pkg);
+
+        } else if (type === "DLC") {
+
+            game.dlcs.push(pkg);
+
+        } else if (type === "PATCH") {
+
+            game.patches.push(pkg);
+        }
+    }
+
+    const result =
+        Array.from(groups.values());
+
+    /*
+     * Ordenação alfabética pelo título.
+     */
+    result.sort(
+        (a, b) =>
+            a.title.localeCompare(
+                b.title,
+                "pt-BR",
+                {
+                    sensitivity: "base"
+                }
+            )
+    );
+
+    return result;
+}
+
+/*
+ * Retorna URL de transferência.
+ *
+ * O endpoint /pkg/{id} é preservado.
+ */
+function packageUrl(pkg) {
+
+    if (pkg.url) {
+        return pkg.url;
+    }
+
+    if (pkg.id === undefined || pkg.id === null) {
+        return null;
+    }
+
+    return "/pkg/" +
+        encodeURIComponent(
+            String(pkg.id)
+        );
+}
+
+/*
+ * Ação de envio.
+ *
+ * Nesta arquitetura o navegador do PS4 é o cliente.
+ *
+ * O servidor continua responsável por fornecer
+ * o PKG através de /pkg/{id}.
+ *
+ * Não existe mais campo de IP do PS4 aqui.
+ */
+function sendPackage(pkg, button) {
+
+    const url =
+        packageUrl(pkg);
+
+    if (!url) {
+
+        showNotice(
+            "PKG sem URL de transferência."
+        );
+
+        return;
+    }
+
+    /*
+     * Não fazemos fetch() do PKG aqui.
+     *
+     * O navegador precisa navegar para o endpoint,
+     * permitindo que o mecanismo de transferência
+     * do PS4 faça a solicitação HTTP normalmente.
+     */
+    button.disabled = true;
+
+    const original =
+        button.textContent;
+
+    button.textContent =
+        "Abrindo...";
+
+    window.location.href = url;
+
+    /*
+     * O navegador normalmente sairá da página.
+     * Caso não saia, restauramos o botão.
+     */
+    setTimeout(
+        function() {
+
+            button.disabled = false;
+            button.textContent = original;
+
+        },
+        3000
+    );
+}
+
+/*
+ * Exibe DLCs individualmente.
+ */
+function openDlc(game) {
+
+    const overlay =
+        document.getElementById(
+            "dlc-overlay"
+        );
+
+    const title =
+        document.getElementById(
+            "dlc-modal-title"
+        );
+
+    const list =
+        document.getElementById(
+            "dlc-list"
+        );
+
+    title.textContent =
+        "DLC — " +
+        game.title;
+
+    list.innerHTML = "";
+
+    if (!game.dlcs.length) {
+
+        list.innerHTML =
+            '<div class="empty">Nenhum DLC disponível.</div>';
+
+    } else {
+
+        for (const dlc of game.dlcs) {
+
+            const item =
+                document.createElement(
+                    "div"
+                );
+
+            item.className =
+                "dlc-item";
+
+            const info =
+                document.createElement(
+                    "div"
+                );
+
+            info.className =
+                "dlc-name";
+
+            const name =
+                document.createElement(
+                    "p"
+                );
+
+            name.className =
+                "dlc-title";
+
+            name.textContent =
+                dlc.title ||
+                dlc.name ||
+                "DLC";
+
+            const meta =
+                document.createElement(
+                    "p"
+                );
+
+            meta.className =
+                "dlc-meta";
+
+            meta.textContent =
+                String(
+                    dlc.contentId ||
+                    ""
+                ) +
+                " • " +
+                formatSize(
+                    dlc.size
+                );
+
+            info.appendChild(name);
+            info.appendChild(meta);
+
+            const button =
+                document.createElement(
+                    "button"
+                );
+
+            button.className =
+                "send-button";
+
+            button.type =
+                "button";
+
+            button.textContent =
+                "ENVIAR";
+
+            button.onclick =
+                function() {
+                    sendPackage(
+                        dlc,
+                        button
+                    );
+                };
+
+            item.appendChild(info);
+            item.appendChild(button);
+
+            list.appendChild(item);
+        }
+    }
+
+    overlay.classList.add(
+        "visible"
+    );
+}
+
+/*
+ * Fecha modal de DLC.
+ */
+function closeDlc() {
+
+    document
+        .getElementById("dlc-overlay")
+        .classList.remove(
+            "visible"
+        );
+}
+
+/*
+ * Renderiza o catálogo.
+ */
+function renderCatalog() {
+
+    const container =
+        document.getElementById(
+            "catalog"
+        );
+
+    const search =
+        document.getElementById(
+            "search"
+        )
+            .value
+            .trim()
+            .toLowerCase();
+
+    const filtered =
+        games.filter(
+            function(game) {
+
+                if (!search) {
+                    return true;
                 }
 
-                const subnet = androidIp.substring(0, androidIp.lastIndexOf('.') + 1);
-                
-                // IPs comuns de PS4 na rede doméstica para testar rapidamente em paralelo
-                const commonHosts = [50, 100, 101, 102, 103, 104, 105, 110, 150, 200];
-                let found = false;
+                return (
+                    game.title
+                        .toLowerCase()
+                        .indexOf(search) >= 0
+                );
+            }
+        );
 
-                for (let host of commonHosts) {
-                    const testIp = subnet + host;
-                    if (testIp === androidIp) continue;
+    container.innerHTML = "";
 
-                    try {
-                        // Tenta testar a porta do BinLoader (9090) do PS4 usando um pedido rápido de imagem/fetch com timeout curto
-                        const controller = new AbortController();
-                        const timeoutId = setTimeout(() => controller.abort(), 400);
+    if (!filtered.length) {
 
-                        await fetch(`http://${testIp}:9090`, { mode: 'no-cors', signal: controller.signal });
-                        clearTimeout(timeoutId);
+        container.innerHTML =
+            '<div class="empty">' +
+            'Nenhum jogo encontrado.' +
+            '</div>';
 
-                        // Se respondeu ou rejeitou por CORS mas abriu ligação, encontramos o PS4!
-                        ipInput.value = testIp;
-                        localStorage.setItem('gtstore_ps4_ip', testIp);
-                        found = true;
-                        break;
-                    } catch (err) {
-                        // Continua a procurar
+        return;
+    }
+
+    for (const game of filtered) {
+
+        const card =
+            document.createElement(
+                "article"
+            );
+
+        card.className =
+            "game-card";
+
+        const coverWrap =
+            document.createElement(
+                "div"
+            );
+
+        coverWrap.className =
+            "cover-wrap";
+
+        if (game.cover) {
+
+            const image =
+                document.createElement(
+                    "img"
+                );
+
+            image.className =
+                "cover";
+
+            image.src =
+                game.cover;
+
+            image.alt =
+                game.title;
+
+            coverWrap.appendChild(
+                image
+            );
+
+        } else {
+
+            const placeholder =
+                document.createElement(
+                    "div"
+                );
+
+            placeholder.className =
+                "cover-placeholder";
+
+            placeholder.textContent =
+                "CAPA INDISPONÍVEL";
+
+            coverWrap.appendChild(
+                placeholder
+            );
+        }
+
+        const content =
+            document.createElement(
+                "div"
+            );
+
+        content.className =
+            "game-content";
+
+        const title =
+            document.createElement(
+                "h2"
+            );
+
+        title.className =
+            "game-title";
+
+        title.textContent =
+            game.title ||
+            "Jogo";
+
+        const id =
+            document.createElement(
+                "p"
+            );
+
+        id.className =
+            "game-id";
+
+        id.textContent =
+            game.key;
+
+        const actions =
+            document.createElement(
+                "div"
+            );
+
+        actions.className =
+            "actions";
+
+        /*
+         * GAME
+         */
+        if (game.game) {
+
+            const button =
+                document.createElement(
+                    "button"
+                );
+
+            button.className =
+                "action";
+
+            button.type =
+                "button";
+
+            button.textContent =
+                "GAME";
+
+            button.onclick =
+                function() {
+                    sendPackage(
+                        game.game,
+                        button
+                    );
+                };
+
+            actions.appendChild(
+                button
+            );
+        }
+
+        /*
+         * UPDATE
+         */
+        if (game.updates.length) {
+
+            /*
+             * Se houver mais de um update,
+             * exibimos o primeiro na ação principal.
+             */
+            const button =
+                document.createElement(
+                    "button"
+                );
+
+            button.className =
+                "action action-update";
+
+            button.type =
+                "button";
+
+            button.textContent =
+                game.updates.length > 1
+                    ? "UPDATE (" +
+                      game.updates.length +
+                      ")"
+                    : "UPDATE";
+
+            button.onclick =
+                function() {
+
+                    if (
+                        game.updates.length === 1
+                    ) {
+
+                        sendPackage(
+                            game.updates[0],
+                            button
+                        );
+
+                        return;
                     }
-                }
 
-                if (found) {
-                    indicator.textContent = 'PS4 detetado com sucesso!';
-                    indicator.className = 'status-badge status-online';
-                } else {
-                    indicator.textContent = 'PS4 não detetado automaticamente. Insira o IP manualmente.';
-                    indicator.className = 'status-badge status-online';
-                }
-            } catch (e) {
-                indicator.textContent = 'Servidor Android Online';
-                indicator.className = 'status-badge status-online';
-            }
+                    openPackageList(
+                        "UPDATE — " +
+                        game.title,
+                        game.updates
+                    );
+                };
+
+            actions.appendChild(
+                button
+            );
         }
 
-                async function installDPI(pkgId) {
-            const ipInput = document.getElementById('ps4-ip').value.trim();
-            
-            if (!ipInput) {
-                alert('AVISO: Por favor, insira o IP do seu PS4.');
-                document.getElementById('ps4-ip').focus();
-                return;
-            }
+        /*
+         * DLC
+         */
+        if (game.dlcs.length) {
 
-            localStorage.setItem('gtstore_ps4_ip', ipInput);
+            const button =
+                document.createElement(
+                    "button"
+                );
 
-            const btn = document.getElementById(`btn-${pkgId}`);
-            const originalText = btn.textContent;
-            btn.textContent = 'A injetar...';
-            btn.disabled = true;
+            button.className =
+                "action action-dlc";
 
-            try {
-                // Mudamos para POST com cabeçalhos simplificados para o navegador do PS4 não recusar
-                const res = await fetch('/api/install-dpi', {
-                    method: 'POST',
-                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ip: ipInput, pkgId: pkgId })
-                });
-                
-                const data = await res.json();
-                
-                if (data.success) {
-                    alert('✅ SUCESSO!\n\n' + data.message);
-                    btn.textContent = 'Enviado ✔️';
-                } else {
-                    alert('❌ ERRO DO SERVIDOR\n\n' + data.error);
-                    btn.textContent = 'Falhou';
-                }
-            } catch (e) {
-                alert('⚠️ ERRO DE REDE NO PS4\n\nDetalhe: ' + e.message + '\n\nDica: Certifique-se de que o BinLoader (porta 9090) está ativo no GoldHEN.');
-                btn.textContent = 'Erro';
-            } finally {
-                if(btn.textContent !== 'Enviado ✔️') {
-                    setTimeout(() => {
-                        btn.textContent = originalText;
-                        btn.disabled = false;
-                    }, 3000);
-                }
-            }
+            button.type =
+                "button";
+
+            button.textContent =
+                "DLC (" +
+                game.dlcs.length +
+                ")";
+
+            button.onclick =
+                function() {
+                    openDlc(game);
+                };
+
+            actions.appendChild(
+                button
+            );
         }
 
-    </script>
+        /*
+         * PATCH
+         *
+         * Só aparece se o servidor realmente
+         * retornar catalogType=PATCH.
+         */
+        if (game.patches.length) {
+
+            const button =
+                document.createElement(
+                    "button"
+                );
+
+            button.className =
+                "action action-patch";
+
+            button.type =
+                "button";
+
+            button.textContent =
+                game.patches.length > 1
+                    ? "PATCH (" +
+                      game.patches.length +
+                      ")"
+                    : "PATCH";
+
+            button.onclick =
+                function() {
+
+                    if (
+                        game.patches.length === 1
+                    ) {
+
+                        sendPackage(
+                            game.patches[0],
+                            button
+                        );
+
+                        return;
+                    }
+
+                    openPackageList(
+                        "PATCH — " +
+                        game.title,
+                        game.patches
+                    );
+                };
+
+            actions.appendChild(
+                button
+            );
+        }
+
+        const info =
+            document.createElement(
+                "div"
+            );
+
+        info.className =
+            "package-info";
+
+        if (game.game) {
+
+            info.textContent =
+                "GAME: " +
+                formatSize(
+                    game.game.size
+                );
+        }
+
+        content.appendChild(title);
+        content.appendChild(id);
+        content.appendChild(actions);
+        content.appendChild(info);
+
+        card.appendChild(
+            coverWrap
+        );
+
+        card.appendChild(
+            content
+        );
+
+        container.appendChild(
+            card
+        );
+    }
+}
+
+/*
+ * Lista genérica para UPDATE/PATCH múltiplos.
+ */
+function openPackageList(titleText, packages) {
+
+    const overlay =
+        document.getElementById(
+            "dlc-overlay"
+        );
+
+    const title =
+        document.getElementById(
+            "dlc-modal-title"
+        );
+
+    const list =
+        document.getElementById(
+            "dlc-list"
+        );
+
+    title.textContent =
+        titleText;
+
+    list.innerHTML = "";
+
+    for (const pkg of packages) {
+
+        const item =
+            document.createElement(
+                "div"
+            );
+
+        item.className =
+            "dlc-item";
+
+        const info =
+            document.createElement(
+                "div"
+            );
+
+        info.className =
+            "dlc-name";
+
+        const name =
+            document.createElement(
+                "p"
+            );
+
+        name.className =
+            "dlc-title";
+
+        name.textContent =
+            pkg.title ||
+            pkg.name ||
+            "PKG";
+
+        const meta =
+            document.createElement(
+                "p"
+            );
+
+        meta.className =
+            "dlc-meta";
+
+        meta.textContent =
+            String(
+                pkg.contentId ||
+                ""
+            ) +
+            " • " +
+            formatSize(
+                pkg.size
+            );
+
+        info.appendChild(name);
+        info.appendChild(meta);
+
+        const button =
+            document.createElement(
+                "button"
+            );
+
+        button.className =
+            "send-button";
+
+        button.type =
+            "button";
+
+        button.textContent =
+            "ENVIAR";
+
+        button.onclick =
+            function() {
+                sendPackage(
+                    pkg,
+                    button
+                );
+            };
+
+        item.appendChild(info);
+        item.appendChild(button);
+
+        list.appendChild(item);
+    }
+
+    overlay.classList.add(
+        "visible"
+    );
+}
+
+/*
+ * Carrega catálogo.
+ */
+async function loadPackages() {
+
+    const container =
+        document.getElementById(
+            "catalog"
+        );
+
+    container.innerHTML =
+        '<div class="loading">' +
+        'Carregando catálogo...' +
+        '</div>';
+
+    try {
+
+        const response =
+            await fetch(
+                "/api/packages",
+                {
+                    cache: "no-store"
+                }
+            );
+
+        if (!response.ok) {
+            throw new Error(
+                "HTTP " +
+                response.status
+            );
+        }
+
+        const data =
+            await response.json();
+
+        /*
+         * Aceitamos tanto:
+         *
+         * { packages: [...] }
+         *
+         * quanto:
+         *
+         * [...]
+         */
+        if (Array.isArray(data)) {
+
+            allPackages = data;
+
+        } else {
+
+            allPackages =
+                Array.isArray(
+                    data.packages
+                )
+                    ? data.packages
+                    : [];
+        }
+
+        games =
+            buildCatalog(
+                allPackages
+            );
+
+        renderCatalog();
+
+    } catch (error) {
+
+        console.error(
+            "Erro ao carregar catálogo:",
+            error
+        );
+
+        container.innerHTML =
+            '<div class="error">' +
+            'Não foi possível carregar o catálogo.' +
+            '</div>';
+    }
+}
+
+/*
+ * Pequeno aviso visual.
+ */
+function showNotice(message) {
+
+    const notice =
+        document.getElementById(
+            "notice"
+        );
+
+    notice.textContent =
+        message;
+
+    notice.classList.add(
+        "visible"
+    );
+
+    setTimeout(
+        function() {
+
+            notice.classList.remove(
+                "visible"
+            );
+
+        },
+        4000
+    );
+}
+
+/*
+ * Eventos.
+ */
+document
+    .getElementById("search")
+    .addEventListener(
+        "input",
+        renderCatalog
+    );
+
+document
+    .getElementById("refresh")
+    .addEventListener(
+        "click",
+        async function() {
+
+            await checkStatus();
+            await loadPackages();
+        }
+    );
+
+document
+    .getElementById("dlc-close")
+    .addEventListener(
+        "click",
+        closeDlc
+    );
+
+document
+    .getElementById("dlc-overlay")
+    .addEventListener(
+        "click",
+        function(event) {
+
+            if (
+                event.target ===
+                event.currentTarget
+            ) {
+                closeDlc();
+            }
+        }
+    );
+
+/*
+ * Inicialização.
+ */
+document.addEventListener(
+    "DOMContentLoaded",
+    async function() {
+
+        await checkStatus();
+        await loadPackages();
+    }
+);
+</script>
+
 </body>
 </html>
