@@ -19,15 +19,8 @@
             --red: #ff453a;
         }
 
-        * {
-            box-sizing: border-box;
-        }
-
-        html, body {
-            margin: 0;
-            padding: 0;
-            min-height: 100%;
-        }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; min-height: 100%; }
 
         body {
             background: var(--bg);
@@ -35,9 +28,7 @@
             font-family: Arial, Helvetica, sans-serif;
         }
 
-        button {
-            font-family: inherit;
-        }
+        button { font-family: inherit; }
 
         .header {
             width: 100%;
@@ -223,7 +214,7 @@
         .action-dlc { background: #7047a3; }
         .action-patch { background: #99651f; }
 
-        /* DESTAQUE DE FOCO DO CONTROLE DO PS4 */
+        /* Foco específico para o cursor do controle do PS4 */
         .action:focus,
         .action:hover,
         .refresh:focus,
@@ -352,14 +343,19 @@
         .notice {
             display: none;
             margin-bottom: 15px;
-            padding: 12px 14px;
+            padding: 14px 16px;
             border-radius: 8px;
             background: #252a31;
-            color: var(--muted);
-            font-size: 13px;
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: bold;
+            border-left: 4px solid var(--primary);
+            white-space: pre-line;
         }
 
         .notice.visible { display: block; }
+        .notice.error { border-left-color: var(--red); background: #321d20; color: #ff817a; }
+        .notice.success { border-left-color: var(--green); background: #182c1e; color: #4cd964; }
 
         @media (max-width: 620px) {
             .game-card { flex-direction: column; }
@@ -414,6 +410,7 @@
 
 let allPackages = [];
 let games = [];
+let ps4ClientIp = "";
 
 function formatSize(bytes) {
     const value = Number(bytes);
@@ -435,6 +432,7 @@ async function checkStatus() {
 
         badge.className = "server-status status-online";
         const ip = data.localAddress || data.address || data.local_address || "";
+        ps4ClientIp = data.clientIp || "";
         text.textContent = "Servidor online — " + (ip ? ip + ":" + data.port : "Porta " + data.port);
     } catch (error) {
         badge.className = "server-status status-offline";
@@ -516,29 +514,45 @@ function buildCatalog(packages) {
     return result;
 }
 
-function packageUrl(pkg) {
-    if (pkg.url) return pkg.url;
-    if (pkg.id !== undefined && pkg.id !== null) return "/pkg/" + encodeURIComponent(String(pkg.id));
-    return null;
-}
-
-function sendPackage(pkg, button) {
-    const url = packageUrl(pkg);
-    if (!url) {
-        showNotice("PKG sem URL de transferência.");
-        return;
-    }
-
+/*
+ * Dispara o instalador chamando a API de DPI do servidor Android
+ */
+async function sendPackage(pkg, button) {
     button.disabled = true;
     const original = button.textContent;
-    button.textContent = "Baixando...";
+    button.textContent = "A enviar...";
+    showNotice("A enviar payload ao PS4 (Porta 9090)...");
 
-    window.location.href = url;
+    try {
+        const response = await fetch("/api/install-dpi", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                pkgId: pkg.id,
+                ip: ps4ClientIp
+            })
+        });
 
-    setTimeout(() => {
-        button.disabled = false;
-        button.textContent = original;
-    }, 4000);
+        const result = await response.json();
+
+        if (result.success) {
+            button.textContent = "Na fila!";
+            showNotice("✓ " + (result.message || "Instalação iniciada! Verifique o console."), "success");
+        } else {
+            button.textContent = "Falha";
+            showNotice("✗ " + (result.error || "Erro ao acionar BinLoader."), "error");
+        }
+    } catch (err) {
+        button.textContent = "Erro";
+        showNotice("✗ Falha de comunicação com o servidor Android: " + err.message, "error");
+    } finally {
+        setTimeout(() => {
+            button.disabled = false;
+            button.textContent = original;
+        }, 5000);
+    }
 }
 
 function openDlc(game) {
@@ -581,7 +595,7 @@ function openPackageList(titleText, packages) {
             const button = document.createElement("button");
             button.className = "send-button";
             button.type = "button";
-            button.textContent = "BAIXAR";
+            button.textContent = "INSTALAR";
             button.onclick = () => sendPackage(pkg, button);
 
             item.appendChild(info);
@@ -717,11 +731,13 @@ async function loadPackages() {
     }
 }
 
-function showNotice(message) {
+function showNotice(message, type = "") {
     const notice = document.getElementById("notice");
     notice.textContent = message;
-    notice.classList.add("visible");
-    setTimeout(() => notice.classList.remove("visible"), 4000);
+    notice.className = "notice visible" + (type ? " " + type : "");
+    setTimeout(() => {
+        notice.classList.remove("visible");
+    }, 7000);
 }
 
 document.getElementById("search").addEventListener("input", renderCatalog);
