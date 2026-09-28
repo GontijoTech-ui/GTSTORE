@@ -5,7 +5,6 @@ import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.BufferedReader
 import java.io.ByteArrayOutputStream
@@ -127,10 +126,11 @@ class HttpServer(
 
     private fun handleClient(socket: Socket) {
         activeConnections.incrementAndGet()
-        
+
         val clientIp = (socket.remoteSocketAddress as? InetSocketAddress)?.address?.hostAddress ?: ""
-        
+
         socket.use { client ->
+            var target = ""
             try {
                 client.soTimeout = SOCKET_TIMEOUT_MS
                 client.tcpNoDelay = true
@@ -153,7 +153,7 @@ class HttpServer(
                 }
 
                 val method = parts[0].uppercase()
-                val target = parts[1]
+                target = parts[1]
                 val headers = HashMap<String, String>()
 
                 while (true) {
@@ -173,8 +173,18 @@ class HttpServer(
                     return
                 }
 
+                // CORREÇÃO: o BufferedReader já consumiu parte (ou todo) o corpo do socket.
+                // O corpo precisa ser lido do MESMO reader. Como o charset é ISO_8859_1,
+                // 1 char = 1 byte, então reconvertemos para os bytes originais.
                 val body = if (method == "POST" && contentLength > 0) {
-                    readRequestBody(client.getInputStream(), contentLength)
+                    val chars = CharArray(contentLength)
+                    var off = 0
+                    while (off < contentLength) {
+                        val n = input.read(chars, off, contentLength - off)
+                        if (n <= 0) break
+                        off += n
+                    }
+                    String(chars, 0, off).toByteArray(StandardCharsets.ISO_8859_1)
                 } else {
                     ByteArray(0)
                 }
@@ -182,44 +192,41 @@ class HttpServer(
                 when (method) {
                     "GET" -> handleRequest(target, headers, output, headOnly = false, clientIp)
                     "HEAD" -> handleRequest(target, headers, output, headOnly = true, clientIp)
-                    "POST" -> handlePostRequest(target, body, output)
+                    "POST" -> handlePostRequest(target, headers, body, output)
                     "OPTIONS" -> sendOptions(output)
                     else -> sendError(output, 405, "Method Not Allowed", mapOf("Allow" to "GET, HEAD, POST, OPTIONS"))
                 }
             } catch (_: SocketException) {
             } catch (_: Exception) {
-                try { sendError(client.getOutputStream(), 500, "Internal Server Error") } catch (_: Exception) {}
+                try {
+                    val out = client.getOutputStream()
+                    // Rotas /api sempre respondem JSON, para o JS da página conseguir ler o erro.
+                    if (target.startsWith("/api/")) {
+                        sendJsonError(out, 500, "Erro interno do servidor (timeout ou falha ao ler a requisição).")
+                    } else {
+                        sendError(out, 500, "Internal Server Error")
+                    }
+                } catch (_: Exception) {}
             } finally {
                 activeConnections.decrementAndGet()
             }
         }
     }
 
-    private fun readRequestBody(input: InputStream, length: Int): ByteArray {
-        val body = ByteArray(length)
-        var offset = 0
-        while (offset < length) {
-            val read = input.read(body, offset, length - offset)
-            if (read <= 0) break
-            offset += read
-        }
-        return if (offset == length) body else body.copyOf(offset)
-    }
-
-    private fun handlePostRequest(target: String, body: ByteArray, output: OutputStream) {
+    private fun handlePostRequest(target: String, headers: Map<String, String>, body: ByteArray, output: OutputStream) {
         val uri = Uri.parse(target)
         val path = uri.path ?: "/"
 
         when (path) {
             "/api/send-payload" -> handleSendPayload(body, output)
             "/api/install" -> handleRemoteInstall(body, output)
-            "/api/install-dpi" -> handleDirectInstallDpi(body, output)
-            else -> sendError(output, 404, "POST endpoint not found")
+            "/api/install-dpi" -> handleDirectInstallDpi(body, headers, output)
+            else -> sendJsonError(output, 404, "POST endpoint not found")
         }
     }
 
     // --- Lógica do Direct Package Installer com RASTREIO DE ERROS ---
-    private fun handleDirectInstallDpi(body: ByteArray, output: OutputStream) {
+    private fun handleDirectInstallDpi(body: ByteArray, headers: Map<String, String>, output: OutputStream) {
         try {
             val json = JSONObject(String(body, StandardCharsets.UTF_8))
             val ps4Ip = json.optString("ip").trim()
@@ -236,6 +243,13 @@ class HttpServer(
                 return
             }
 
+            // Metadados reais do PKG (TITLE, CONTENT_ID, CATEGORY, ícone).
+            val meta = PkgMetaReader.read(context, packageInfo.uri)
+            if (meta == null) {
+                sendJsonError(output, 422, "[PASSO 2b] Não consegui ler o param.sfo deste PKG (${packageInfo.fileName}).")
+                return
+            }
+
             val payloadTemplate = loadPayload("payload.bin") ?: loadPayload("direct-installer.bin")
             if (payloadTemplate == null) {
                 sendJsonError(output, 500, "[PASSO 3] Ficheiro payload.bin não encontrado na pasta assets/payloads.")
@@ -249,7 +263,8 @@ class HttpServer(
                 return
             }
 
-            val localIp = localAddress
+            // IP do telemóvel como o PS4 o enxerga (o mesmo que ele usou para abrir a página).
+            val localIp = requestHost(headers)
             if (localIp == "0.0.0.0" || localIp.isEmpty()) {
                 sendJsonError(output, 500, "[PASSO 5] O telemóvel não conseguiu ler o seu próprio IP. (Desligue os dados móveis 4G/5G).")
                 return
@@ -276,7 +291,7 @@ class HttpServer(
                     try {
                         tempServer.accept().use { ps4Client ->
                             ps4Client.getOutputStream().apply {
-                                write(buildDpiInfo(manifestUrl, packageInfo))
+                                write(buildDpiInfo(manifestUrl, packageInfo, meta))
                                 flush()
                             }
                         }
@@ -293,18 +308,20 @@ class HttpServer(
         }
     }
 
-    private fun buildDpiInfo(url: String, info: PackageInfo): ByteArray {
+    /** Tudo em little-endian: 1u, URL, nome, ContentID, tipo, tamanho (int64), ícone. */
+    private fun buildDpiInfo(url: String, info: PackageInfo, meta: PkgMetaReader.Meta): ByteArray {
         val out = ByteArrayOutputStream()
         fun i32(v: Int) = out.write(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(v).array())
         fun str(s: String) { val b = s.toByteArray(StandardCharsets.UTF_8); i32(b.size); out.write(b) }
 
         i32(1)
         str(url)
-        str(info.name.substringBeforeLast("."))
-        str("UP0000-CUSA00000_00-0000000000000000")
-        str("PS4GD")
+        str(meta.title)
+        str(meta.contentId)
+        str(meta.bgftType) // PS4GD = jogo, PS4GP = update, PS4AC = DLC
         out.write(ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN).putLong(info.size).array())
-        i32(0)
+        val icon = meta.icon
+        if (icon == null || icon.isEmpty()) i32(0) else { i32(icon.size); out.write(icon) }
         return out.toByteArray()
     }
 
@@ -317,6 +334,12 @@ class HttpServer(
             if (match) return i
         }
         return -1
+    }
+
+    /** IPv4 usado pelo cliente para chegar até aqui (cabeçalho Host); cai para a detecção por interface. */
+    private fun requestHost(headers: Map<String, String>): String {
+        val host = headers["host"]?.substringBefore(':')?.trim()
+        return if (!host.isNullOrEmpty() && isValidIp(host)) host else localAddress
     }
 
     private fun handleSendPayload(body: ByteArray, output: OutputStream) {
@@ -425,7 +448,7 @@ class HttpServer(
 
                 val body = JSONObject().put("type", "direct").put("packages", JSONArray().put(pkgUrl)).toString()
                 val requestBytes = body.toByteArray(StandardCharsets.UTF_8)
-                
+
                 val request = "POST /api/install HTTP/1.1\r\n" +
                         "Host: $ip:12800\r\n" +
                         "Content-Type: application/json\r\n" +
@@ -509,7 +532,7 @@ class HttpServer(
             path == "/api/packages" -> sendPackagesJson(output, headOnly)
             path.startsWith("/json/") -> {
                 val id = path.removePrefix("/json/").removeSuffix(".json").toIntOrNull()
-                if (id != null) sendManifestJson(id, output, headOnly) else sendError(output, 404, "Not Found")
+                if (id != null) sendManifestJson(id, headers, output, headOnly) else sendError(output, 404, "Not Found")
             }
             path == "/download" || path == "/pkg" -> {
                 val id = uri.getQueryParameter("id")?.toIntOrNull()
@@ -532,13 +555,13 @@ class HttpServer(
         }
     }
 
-    private fun sendManifestJson(packageId: Int, output: OutputStream, headOnly: Boolean) {
+    private fun sendManifestJson(packageId: Int, headers: Map<String, String>, output: OutputStream, headOnly: Boolean) {
         val packageInfo = getPackages().firstOrNull { it.id == packageId }
         if (packageInfo == null) {
             sendError(output, 404, "Package Not Found")
             return
         }
-        val fileUrl = "http://$localAddress:$port/pkg/${packageInfo.id}"
+        val fileUrl = "http://${requestHost(headers)}:$port/pkg/${packageInfo.id}"
         val json = """{"originalFileSize":${packageInfo.size},"packageDigest":"0000000000000000000000000000000000000000","numberOfSplitFiles":1,"pieces":[{"url":"$fileUrl","fileOffset":0,"fileSize":${packageInfo.size},"hashValue":"0000000000000000000000000000000000000000"}]}"""
         sendResponse(output, 200, "OK", "application/json; charset=utf-8", json.toByteArray(StandardCharsets.UTF_8), headOnly, mapOf("Access-Control-Allow-Origin" to "*"))
     }
@@ -660,20 +683,6 @@ class HttpServer(
         }
     }
 
-    private fun skipFully(input: InputStream, bytes: Long) {
-        var remaining = bytes
-        while (remaining > 0) {
-            val skipped = input.skip(remaining)
-            if (skipped > 0) {
-                remaining -= skipped
-                continue
-            }
-            val read = input.read()
-            if (read == -1) break
-            remaining--
-        }
-    }
-
     private fun getPackages(): List<PackageInfo> {
         val preferences = context.getSharedPreferences("GTSTORE", Context.MODE_PRIVATE)
         val savedUri = preferences.getString("pkg_folder_uri", null)
@@ -737,7 +746,7 @@ class HttpServer(
             .put("address", status.localAddress).put("localAddress", status.localAddress)
             .put("url", status.url).put("activeConnections", status.activeConnections)
             .put("clientIp", clientIp)
-            
+
         val body = json.toString().toByteArray(StandardCharsets.UTF_8)
         sendResponse(output, 200, "OK", "application/json; charset=utf-8", body, headOnly, mapOf("Cache-Control" to "no-cache", "Access-Control-Allow-Origin" to "*"))
     }
