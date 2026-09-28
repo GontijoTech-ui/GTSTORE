@@ -2,14 +2,8 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GTSTORE</title>
-
     <style>
         :root {
             --bg: #0b0d10;
@@ -29,8 +23,7 @@
             box-sizing: border-box;
         }
 
-        html,
-        body {
+        html, body {
             margin: 0;
             padding: 0;
             min-height: 100%;
@@ -39,10 +32,7 @@
         body {
             background: var(--bg);
             color: var(--text);
-            font-family:
-                Arial,
-                Helvetica,
-                sans-serif;
+            font-family: Arial, Helvetica, sans-serif;
         }
 
         button {
@@ -100,13 +90,8 @@
             background: var(--orange);
         }
 
-        .status-online .status-dot {
-            background: var(--green);
-        }
-
-        .status-offline .status-dot {
-            background: var(--red);
-        }
+        .status-online .status-dot { background: var(--green); }
+        .status-offline .status-dot { background: var(--red); }
 
         .container {
             width: 94%;
@@ -137,6 +122,7 @@
 
         .search:focus {
             border-color: var(--primary);
+            box-shadow: 0 0 10px rgba(0, 112, 204, 0.6);
         }
 
         .refresh {
@@ -147,10 +133,7 @@
             color: var(--text);
             cursor: pointer;
             font-weight: 700;
-        }
-
-        .refresh:hover {
-            background: #252a31;
+            outline: none;
         }
 
         .catalog {
@@ -225,34 +208,42 @@
         .action {
             border: 0;
             border-radius: 7px;
-            padding: 11px 16px;
+            padding: 11px 18px;
             min-width: 100px;
             background: var(--primary);
             color: white;
             font-size: 14px;
             font-weight: 800;
             cursor: pointer;
+            outline: none;
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
         }
 
-        .action:hover {
-            background: var(--primary-hover);
+        .action-update { background: #355f8c; }
+        .action-dlc { background: #7047a3; }
+        .action-patch { background: #99651f; }
+
+        /* DESTAQUE DE FOCO DO CONTROLE DO PS4 */
+        .action:focus,
+        .action:hover,
+        .refresh:focus,
+        .refresh:hover,
+        .send-button:focus,
+        .send-button:hover,
+        .close:focus,
+        .close:hover {
+            outline: 3px solid #ffffff !important;
+            box-shadow: 0 0 14px rgba(255, 255, 255, 0.9) !important;
+            transform: scale(1.05);
+            z-index: 5;
         }
 
-        .action:disabled {
+        .action:disabled,
+        .send-button:disabled {
             opacity: 0.5;
             cursor: default;
-        }
-
-        .action-update {
-            background: #355f8c;
-        }
-
-        .action-dlc {
-            background: #7047a3;
-        }
-
-        .action-patch {
-            background: #99651f;
+            transform: none !important;
+            box-shadow: none !important;
         }
 
         .package-info {
@@ -261,9 +252,7 @@
             font-size: 12px;
         }
 
-        .empty,
-        .loading,
-        .error {
+        .empty, .loading, .error {
             background: var(--panel);
             border: 1px solid var(--border);
             border-radius: 10px;
@@ -272,9 +261,7 @@
             color: var(--muted);
         }
 
-        .error {
-            color: #ff817a;
-        }
+        .error { color: #ff817a; }
 
         .footer {
             padding: 30px 10px;
@@ -290,13 +277,11 @@
             align-items: center;
             justify-content: center;
             padding: 20px;
-            background: rgba(0, 0, 0, 0.82);
+            background: rgba(0, 0, 0, 0.85);
             z-index: 1000;
         }
 
-        .overlay.visible {
-            display: flex;
-        }
+        .overlay.visible { display: flex; }
 
         .modal {
             width: 100%;
@@ -317,10 +302,7 @@
             margin-bottom: 15px;
         }
 
-        .modal-title {
-            margin: 0;
-            font-size: 21px;
-        }
+        .modal-title { margin: 0; font-size: 21px; }
 
         .close {
             border: 0;
@@ -331,6 +313,7 @@
             border-radius: 7px;
             font-size: 20px;
             cursor: pointer;
+            outline: none;
         }
 
         .dlc-list {
@@ -350,22 +333,9 @@
             padding: 12px;
         }
 
-        .dlc-name {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .dlc-title {
-            margin: 0 0 5px;
-            font-size: 15px;
-            word-break: break-word;
-        }
-
-        .dlc-meta {
-            margin: 0;
-            color: var(--muted);
-            font-size: 11px;
-        }
+        .dlc-name { flex: 1; min-width: 0; }
+        .dlc-title { margin: 0 0 5px; font-size: 15px; word-break: break-word; }
+        .dlc-meta { margin: 0; color: var(--muted); font-size: 11px; }
 
         .send-button {
             flex-shrink: 0;
@@ -373,17 +343,10 @@
             border-radius: 7px;
             background: var(--primary);
             color: white;
-            padding: 10px 14px;
+            padding: 10px 16px;
             font-weight: 800;
             cursor: pointer;
-        }
-
-        .send-button:hover {
-            background: var(--primary-hover);
-        }
-
-        .send-button:disabled {
-            opacity: 0.5;
+            outline: none;
         }
 
         .notice {
@@ -396,1260 +359,385 @@
             font-size: 13px;
         }
 
-        .notice.visible {
-            display: block;
-        }
+        .notice.visible { display: block; }
 
         @media (max-width: 620px) {
-            .game-card {
-                flex-direction: column;
-            }
-
+            .game-card { flex-direction: column; }
             .cover-wrap {
                 width: 100%;
                 flex-basis: auto;
                 display: flex;
                 justify-content: center;
             }
-
-            .game-title {
-                text-align: center;
-            }
-
-            .game-id {
-                text-align: center;
-            }
-
-            .actions {
-                justify-content: center;
-            }
-
-            .package-info {
-                text-align: center;
-            }
+            .game-title, .game-id, .actions, .package-info { text-align: center; }
+            .actions { justify-content: center; }
         }
     </style>
 </head>
-
 <body>
 
 <header class="header">
-
-    <img
-        class="logo"
-        src="/logo.jpg"
-        alt="GTSTORE"
-        onerror="this.style.display='none';"
-    >
-
+    <img class="logo" src="/logo.jpg" alt="GTSTORE" onerror="this.style.display='none';">
     <h1 class="brand">GTSTORE</h1>
-
-    <p class="subtitle">
-        PS4 PKG Store
-    </p>
-
-    <div
-        id="server-status"
-        class="server-status"
-    >
+    <p class="subtitle">PS4 PKG Store</p>
+    <div id="server-status" class="server-status">
         <span class="status-dot"></span>
-        <span id="server-status-text">
-            A verificar servidor...
-        </span>
+        <span id="server-status-text">A verificar servidor...</span>
     </div>
-
 </header>
 
 <main class="container">
-
     <div class="toolbar">
-
-        <input
-            id="search"
-            class="search"
-            type="search"
-            placeholder="Pesquisar jogo..."
-            autocomplete="off"
-        >
-
-        <button
-            id="refresh"
-            class="refresh"
-            type="button"
-        >
-            Atualizar
-        </button>
-
+        <input id="search" class="search" type="search" placeholder="Pesquisar jogo..." autocomplete="off">
+        <button id="refresh" class="refresh" type="button">Atualizar</button>
     </div>
-
-    <div
-        id="notice"
-        class="notice"
-    ></div>
-
-    <section
-        id="catalog"
-        class="catalog"
-    >
-        <div class="loading">
-            Carregando catálogo...
-        </div>
+    <div id="notice" class="notice"></div>
+    <section id="catalog" class="catalog">
+        <div class="loading">Carregando catálogo...</div>
     </section>
-
 </main>
 
-<footer class="footer">
-    GTSTORE
-</footer>
+<footer class="footer">GTSTORE</footer>
 
-<div
-    id="dlc-overlay"
-    class="overlay"
->
+<div id="dlc-overlay" class="overlay">
     <div class="modal">
-
         <div class="modal-header">
-
-            <h2
-                id="dlc-modal-title"
-                class="modal-title"
-            >
-                DLC
-            </h2>
-
-            <button
-                id="dlc-close"
-                class="close"
-                type="button"
-            >
-                ×
-            </button>
-
+            <h2 id="dlc-modal-title" class="modal-title">DLC</h2>
+            <button id="dlc-close" class="close" type="button">×</button>
         </div>
-
-        <div
-            id="dlc-list"
-            class="dlc-list"
-        ></div>
-
+        <div id="dlc-list" class="dlc-list"></div>
     </div>
 </div>
 
 <script>
 "use strict";
 
-/*
- * Catálogo recebido do servidor.
- */
 let allPackages = [];
 let games = [];
 
-/*
- * Escapa texto antes de inseri-lo no HTML.
- */
-function escapeHtml(value) {
-    return String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
-
-/*
- * Formatação do tamanho.
- */
 function formatSize(bytes) {
-
     const value = Number(bytes);
-
-    if (!Number.isFinite(value) || value < 0) {
-        return "Tamanho desconhecido";
-    }
-
-    if (value < 1024) {
-        return value + " B";
-    }
-
-    if (value < 1024 * 1024) {
-        return (value / 1024).toFixed(2) + " KB";
-    }
-
-    if (value < 1024 * 1024 * 1024) {
-        return (value / (1024 * 1024)).toFixed(2) + " MB";
-    }
-
+    if (!Number.isFinite(value) || value < 0) return "Tamanho desconhecido";
+    if (value < 1024) return value + " B";
+    if (value < 1024 * 1024) return (value / 1024).toFixed(2) + " KB";
+    if (value < 1024 * 1024 * 1024) return (value / (1024 * 1024)).toFixed(2) + " MB";
     return (value / (1024 * 1024 * 1024)).toFixed(2) + " GB";
 }
 
-/*
- * Atualiza status do servidor.
- */
 async function checkStatus() {
-
     const badge = document.getElementById("server-status");
     const text = document.getElementById("server-status-text");
 
     try {
-
-        const response = await fetch(
-            "/api/status",
-            {
-                cache: "no-store"
-            }
-        );
-
-        if (!response.ok) {
-            throw new Error("HTTP " + response.status);
-        }
-
+        const response = await fetch("/api/status", { cache: "no-store" });
+        if (!response.ok) throw new Error("HTTP " + response.status);
         const data = await response.json();
 
         badge.className = "server-status status-online";
-
-        text.textContent =
-            "Servidor online — " +
-            (data.local_address || "") +
-            ":" +
-            (data.port || "");
-
+        const ip = data.localAddress || data.address || data.local_address || "";
+        text.textContent = "Servidor online — " + (ip ? ip + ":" + data.port : "Porta " + data.port);
     } catch (error) {
-
         badge.className = "server-status status-offline";
-
-        text.textContent =
-            "Servidor indisponível";
+        text.textContent = "Servidor indisponível";
     }
 }
 
-/*
- * Normaliza o tipo retornado pelo servidor.
- *
- * A classificação deve vir do metadata do PKG.
- * Não utilizamos o nome do arquivo para isso.
- */
 function normalizeType(pkg) {
-
-    const type =
-        String(
-            pkg.catalogType ||
-            pkg.type ||
-            ""
-        ).toUpperCase();
-
-    if (type === "GAME") {
-        return "GAME";
-    }
-
-    if (type === "UPDATE") {
-        return "UPDATE";
-    }
-
-    if (type === "DLC") {
-        return "DLC";
-    }
-
-    if (type === "PATCH") {
-        return "PATCH";
-    }
-
+    const type = String(pkg.catalogType || pkg.type || "").toUpperCase();
+    if (type === "GAME") return "GAME";
+    if (type === "UPDATE") return "UPDATE";
+    if (type === "DLC") return "DLC";
+    if (type === "PATCH") return "PATCH";
     return "OTHER";
 }
 
-/*
- * Obtém a chave de agrupamento.
- *
- * A preferência é CONTENT_ID.
- * O servidor deve fornecer o valor derivado
- * do metadata real do PKG.
- */
 function groupKey(pkg) {
-
-    const contentId =
-        String(pkg.contentId || "")
-            .trim()
-            .toUpperCase();
-
+    const contentId = String(pkg.contentId || "").trim().toUpperCase();
     if (contentId) {
-
-        const match =
-            contentId.match(/CUSA\d+/i);
-
-        if (match) {
-            return match[0].toUpperCase();
-        }
-
-        const prefix =
-            contentId.split("_00-")[0];
-
-        if (prefix) {
-            return prefix;
-        }
+        const match = contentId.match(/CUSA\d+/i);
+        if (match) return match[0].toUpperCase();
+        const prefix = contentId.split("_00-")[0];
+        if (prefix) return prefix;
     }
-
-    /*
-     * Sem metadata não criamos uma identidade
-     * artificial baseada no nome do arquivo.
-     */
-    return null;
+    return (pkg.title || pkg.name || ("PKG_" + pkg.id)).trim().toUpperCase();
 }
 
-/*
- * Escolhe a imagem de capa retornada pelo servidor.
- */
 function packageIcon(pkg) {
-
-    if (pkg.iconUrl) {
-        return pkg.iconUrl;
-    }
-
+    if (pkg.iconUrl) return pkg.iconUrl;
     if (pkg.icon) {
-
-        const icon =
-            String(pkg.icon);
-
-        if (icon.indexOf("data:") === 0) {
-            return icon;
-        }
-
-        return "data:image/png;base64," + icon;
+        const icon = String(pkg.icon);
+        return icon.startsWith("data:") ? icon : "data:image/png;base64," + icon;
     }
-
     return null;
 }
 
-/*
- * Cria o catálogo agrupado.
- */
 function buildCatalog(packages) {
-
     const groups = new Map();
 
     for (const pkg of packages) {
-
         const type = normalizeType(pkg);
-
-        /*
-         * OTHER não entra no catálogo principal.
-         */
-        if (type === "OTHER") {
-            continue;
-        }
-
         const key = groupKey(pkg);
 
-        if (!key) {
-            continue;
-        }
-
         if (!groups.has(key)) {
-
-            groups.set(
-                key,
-                {
-                    key: key,
-                    title: "",
-                    cover: null,
-                    game: null,
-                    updates: [],
-                    dlcs: [],
-                    patches: []
-                }
-            );
+            groups.set(key, {
+                key: key,
+                title: "",
+                cover: null,
+                game: null,
+                updates: [],
+                dlcs: [],
+                patches: []
+            });
         }
 
-        const game =
-            groups.get(key);
+        const game = groups.get(key);
+        const title = String(pkg.title || pkg.name || "").trim();
 
-        const title =
-            String(
-                pkg.title ||
-                pkg.name ||
-                ""
-            ).trim();
+        if (!game.title && title) game.title = title;
 
-        /*
-         * O título vem preferencialmente do metadata.
-         */
-        if (!game.title && title) {
-            game.title = title;
-        }
-
-        const icon =
-            packageIcon(pkg);
-
-        if (!game.cover && icon) {
-            game.cover = icon;
-        }
+        const icon = packageIcon(pkg);
+        if (!game.cover && icon) game.cover = icon;
 
         if (type === "GAME") {
-
-            if (!game.game) {
-                game.game = pkg;
-            }
-
+            if (!game.game) game.game = pkg;
         } else if (type === "UPDATE") {
-
             game.updates.push(pkg);
-
         } else if (type === "DLC") {
-
             game.dlcs.push(pkg);
-
         } else if (type === "PATCH") {
-
             game.patches.push(pkg);
+        } else {
+            if (!game.game) game.game = pkg;
         }
     }
 
-    const result =
-        Array.from(groups.values());
-
-    /*
-     * Ordenação alfabética pelo título.
-     */
-    result.sort(
-        (a, b) =>
-            a.title.localeCompare(
-                b.title,
-                "pt-BR",
-                {
-                    sensitivity: "base"
-                }
-            )
-    );
-
+    const result = Array.from(groups.values());
+    result.sort((a, b) => a.title.localeCompare(b.title, "pt-BR", { sensitivity: "base" }));
     return result;
 }
 
-/*
- * Retorna URL de transferência.
- *
- * O endpoint /pkg/{id} é preservado.
- */
 function packageUrl(pkg) {
-
-    if (pkg.url) {
-        return pkg.url;
-    }
-
-    if (pkg.id === undefined || pkg.id === null) {
-        return null;
-    }
-
-    return "/pkg/" +
-        encodeURIComponent(
-            String(pkg.id)
-        );
+    if (pkg.url) return pkg.url;
+    if (pkg.id !== undefined && pkg.id !== null) return "/pkg/" + encodeURIComponent(String(pkg.id));
+    return null;
 }
 
-/*
- * Ação de envio.
- *
- * Nesta arquitetura o navegador do PS4 é o cliente.
- *
- * O servidor continua responsável por fornecer
- * o PKG através de /pkg/{id}.
- *
- * Não existe mais campo de IP do PS4 aqui.
- */
 function sendPackage(pkg, button) {
-
-    const url =
-        packageUrl(pkg);
-
+    const url = packageUrl(pkg);
     if (!url) {
-
-        showNotice(
-            "PKG sem URL de transferência."
-        );
-
+        showNotice("PKG sem URL de transferência.");
         return;
     }
 
-    /*
-     * Não fazemos fetch() do PKG aqui.
-     *
-     * O navegador precisa navegar para o endpoint,
-     * permitindo que o mecanismo de transferência
-     * do PS4 faça a solicitação HTTP normalmente.
-     */
     button.disabled = true;
-
-    const original =
-        button.textContent;
-
-    button.textContent =
-        "Abrindo...";
+    const original = button.textContent;
+    button.textContent = "Baixando...";
 
     window.location.href = url;
 
-    /*
-     * O navegador normalmente sairá da página.
-     * Caso não saia, restauramos o botão.
-     */
-    setTimeout(
-        function() {
-
-            button.disabled = false;
-            button.textContent = original;
-
-        },
-        3000
-    );
+    setTimeout(() => {
+        button.disabled = false;
+        button.textContent = original;
+    }, 4000);
 }
 
-/*
- * Exibe DLCs individualmente.
- */
 function openDlc(game) {
+    openPackageList("DLC — " + game.title, game.dlcs);
+}
 
-    const overlay =
-        document.getElementById(
-            "dlc-overlay"
-        );
+function closeDlc() {
+    document.getElementById("dlc-overlay").classList.remove("visible");
+}
 
-    const title =
-        document.getElementById(
-            "dlc-modal-title"
-        );
+function openPackageList(titleText, packages) {
+    const overlay = document.getElementById("dlc-overlay");
+    const title = document.getElementById("dlc-modal-title");
+    const list = document.getElementById("dlc-list");
 
-    const list =
-        document.getElementById(
-            "dlc-list"
-        );
-
-    title.textContent =
-        "DLC — " +
-        game.title;
-
+    title.textContent = titleText;
     list.innerHTML = "";
 
-    if (!game.dlcs.length) {
-
-        list.innerHTML =
-            '<div class="empty">Nenhum DLC disponível.</div>';
-
+    if (!packages.length) {
+        list.innerHTML = '<div class="empty">Nenhum pacote disponível.</div>';
     } else {
+        for (const pkg of packages) {
+            const item = document.createElement("div");
+            item.className = "dlc-item";
 
-        for (const dlc of game.dlcs) {
+            const info = document.createElement("div");
+            info.className = "dlc-name";
 
-            const item =
-                document.createElement(
-                    "div"
-                );
+            const name = document.createElement("p");
+            name.className = "dlc-title";
+            name.textContent = pkg.title || pkg.name || "PKG";
 
-            item.className =
-                "dlc-item";
-
-            const info =
-                document.createElement(
-                    "div"
-                );
-
-            info.className =
-                "dlc-name";
-
-            const name =
-                document.createElement(
-                    "p"
-                );
-
-            name.className =
-                "dlc-title";
-
-            name.textContent =
-                dlc.title ||
-                dlc.name ||
-                "DLC";
-
-            const meta =
-                document.createElement(
-                    "p"
-                );
-
-            meta.className =
-                "dlc-meta";
-
-            meta.textContent =
-                String(
-                    dlc.contentId ||
-                    ""
-                ) +
-                " • " +
-                formatSize(
-                    dlc.size
-                );
+            const meta = document.createElement("p");
+            meta.className = "dlc-meta";
+            meta.textContent = String(pkg.contentId || "") + " • " + formatSize(pkg.size);
 
             info.appendChild(name);
             info.appendChild(meta);
 
-            const button =
-                document.createElement(
-                    "button"
-                );
-
-            button.className =
-                "send-button";
-
-            button.type =
-                "button";
-
-            button.textContent =
-                "ENVIAR";
-
-            button.onclick =
-                function() {
-                    sendPackage(
-                        dlc,
-                        button
-                    );
-                };
+            const button = document.createElement("button");
+            button.className = "send-button";
+            button.type = "button";
+            button.textContent = "BAIXAR";
+            button.onclick = () => sendPackage(pkg, button);
 
             item.appendChild(info);
             item.appendChild(button);
-
             list.appendChild(item);
         }
     }
-
-    overlay.classList.add(
-        "visible"
-    );
+    overlay.classList.add("visible");
 }
 
-/*
- * Fecha modal de DLC.
- */
-function closeDlc() {
-
-    document
-        .getElementById("dlc-overlay")
-        .classList.remove(
-            "visible"
-        );
-}
-
-/*
- * Renderiza o catálogo.
- */
 function renderCatalog() {
+    const container = document.getElementById("catalog");
+    const search = document.getElementById("search").value.trim().toLowerCase();
 
-    const container =
-        document.getElementById(
-            "catalog"
-        );
-
-    const search =
-        document.getElementById(
-            "search"
-        )
-            .value
-            .trim()
-            .toLowerCase();
-
-    const filtered =
-        games.filter(
-            function(game) {
-
-                if (!search) {
-                    return true;
-                }
-
-                return (
-                    game.title
-                        .toLowerCase()
-                        .indexOf(search) >= 0
-                );
-            }
-        );
-
+    const filtered = games.filter(g => !search || g.title.toLowerCase().includes(search));
     container.innerHTML = "";
 
     if (!filtered.length) {
-
-        container.innerHTML =
-            '<div class="empty">' +
-            'Nenhum jogo encontrado.' +
-            '</div>';
-
+        container.innerHTML = '<div class="empty">Nenhum jogo encontrado.</div>';
         return;
     }
 
     for (const game of filtered) {
+        const card = document.createElement("article");
+        card.className = "game-card";
 
-        const card =
-            document.createElement(
-                "article"
-            );
-
-        card.className =
-            "game-card";
-
-        const coverWrap =
-            document.createElement(
-                "div"
-            );
-
-        coverWrap.className =
-            "cover-wrap";
+        const coverWrap = document.createElement("div");
+        coverWrap.className = "cover-wrap";
 
         if (game.cover) {
-
-            const image =
-                document.createElement(
-                    "img"
-                );
-
-            image.className =
-                "cover";
-
-            image.src =
-                game.cover;
-
-            image.alt =
-                game.title;
-
-            coverWrap.appendChild(
-                image
-            );
-
+            const image = document.createElement("img");
+            image.className = "cover";
+            image.src = game.cover;
+            image.alt = game.title;
+            coverWrap.appendChild(image);
         } else {
-
-            const placeholder =
-                document.createElement(
-                    "div"
-                );
-
-            placeholder.className =
-                "cover-placeholder";
-
-            placeholder.textContent =
-                "CAPA INDISPONÍVEL";
-
-            coverWrap.appendChild(
-                placeholder
-            );
+            const placeholder = document.createElement("div");
+            placeholder.className = "cover-placeholder";
+            placeholder.textContent = "CAPA INDISPONÍVEL";
+            coverWrap.appendChild(placeholder);
         }
 
-        const content =
-            document.createElement(
-                "div"
-            );
+        const content = document.createElement("div");
+        content.className = "game-content";
 
-        content.className =
-            "game-content";
+        const title = document.createElement("h2");
+        title.className = "game-title";
+        title.textContent = game.title || "Jogo";
 
-        const title =
-            document.createElement(
-                "h2"
-            );
+        const id = document.createElement("p");
+        id.className = "game-id";
+        id.textContent = game.key;
 
-        title.className =
-            "game-title";
+        const actions = document.createElement("div");
+        actions.className = "actions";
 
-        title.textContent =
-            game.title ||
-            "Jogo";
-
-        const id =
-            document.createElement(
-                "p"
-            );
-
-        id.className =
-            "game-id";
-
-        id.textContent =
-            game.key;
-
-        const actions =
-            document.createElement(
-                "div"
-            );
-
-        actions.className =
-            "actions";
-
-        /*
-         * GAME
-         */
+        // GAME
         if (game.game) {
-
-            const button =
-                document.createElement(
-                    "button"
-                );
-
-            button.className =
-                "action";
-
-            button.type =
-                "button";
-
-            button.textContent =
-                "GAME";
-
-            button.onclick =
-                function() {
-                    sendPackage(
-                        game.game,
-                        button
-                    );
-                };
-
-            actions.appendChild(
-                button
-            );
+            const btn = document.createElement("button");
+            btn.className = "action";
+            btn.type = "button";
+            btn.textContent = "GAME";
+            btn.onclick = () => sendPackage(game.game, btn);
+            actions.appendChild(btn);
         }
 
-        /*
-         * UPDATE
-         */
+        // UPDATE
         if (game.updates.length) {
-
-            /*
-             * Se houver mais de um update,
-             * exibimos o primeiro na ação principal.
-             */
-            const button =
-                document.createElement(
-                    "button"
-                );
-
-            button.className =
-                "action action-update";
-
-            button.type =
-                "button";
-
-            button.textContent =
-                game.updates.length > 1
-                    ? "UPDATE (" +
-                      game.updates.length +
-                      ")"
-                    : "UPDATE";
-
-            button.onclick =
-                function() {
-
-                    if (
-                        game.updates.length === 1
-                    ) {
-
-                        sendPackage(
-                            game.updates[0],
-                            button
-                        );
-
-                        return;
-                    }
-
-                    openPackageList(
-                        "UPDATE — " +
-                        game.title,
-                        game.updates
-                    );
-                };
-
-            actions.appendChild(
-                button
-            );
+            const btn = document.createElement("button");
+            btn.className = "action action-update";
+            btn.type = "button";
+            btn.textContent = game.updates.length > 1 ? "UPDATE (" + game.updates.length + ")" : "UPDATE";
+            btn.onclick = () => {
+                if (game.updates.length === 1) sendPackage(game.updates[0], btn);
+                else openPackageList("UPDATE — " + game.title, game.updates);
+            };
+            actions.appendChild(btn);
         }
 
-        /*
-         * DLC
-         */
+        // DLC
         if (game.dlcs.length) {
-
-            const button =
-                document.createElement(
-                    "button"
-                );
-
-            button.className =
-                "action action-dlc";
-
-            button.type =
-                "button";
-
-            button.textContent =
-                "DLC (" +
-                game.dlcs.length +
-                ")";
-
-            button.onclick =
-                function() {
-                    openDlc(game);
-                };
-
-            actions.appendChild(
-                button
-            );
+            const btn = document.createElement("button");
+            btn.className = "action action-dlc";
+            btn.type = "button";
+            btn.textContent = "DLC (" + game.dlcs.length + ")";
+            btn.onclick = () => openDlc(game);
+            actions.appendChild(btn);
         }
 
-        /*
-         * PATCH
-         *
-         * Só aparece se o servidor realmente
-         * retornar catalogType=PATCH.
-         */
+        // PATCH
         if (game.patches.length) {
-
-            const button =
-                document.createElement(
-                    "button"
-                );
-
-            button.className =
-                "action action-patch";
-
-            button.type =
-                "button";
-
-            button.textContent =
-                game.patches.length > 1
-                    ? "PATCH (" +
-                      game.patches.length +
-                      ")"
-                    : "PATCH";
-
-            button.onclick =
-                function() {
-
-                    if (
-                        game.patches.length === 1
-                    ) {
-
-                        sendPackage(
-                            game.patches[0],
-                            button
-                        );
-
-                        return;
-                    }
-
-                    openPackageList(
-                        "PATCH — " +
-                        game.title,
-                        game.patches
-                    );
-                };
-
-            actions.appendChild(
-                button
-            );
+            const btn = document.createElement("button");
+            btn.className = "action action-patch";
+            btn.type = "button";
+            btn.textContent = game.patches.length > 1 ? "PATCH (" + game.patches.length + ")" : "PATCH";
+            btn.onclick = () => {
+                if (game.patches.length === 1) sendPackage(game.patches[0], btn);
+                else openPackageList("PATCH — " + game.title, game.patches);
+            };
+            actions.appendChild(btn);
         }
 
-        const info =
-            document.createElement(
-                "div"
-            );
-
-        info.className =
-            "package-info";
-
-        if (game.game) {
-
-            info.textContent =
-                "GAME: " +
-                formatSize(
-                    game.game.size
-                );
-        }
+        const info = document.createElement("div");
+        info.className = "package-info";
+        if (game.game) info.textContent = "Tamanho base: " + formatSize(game.game.size);
 
         content.appendChild(title);
         content.appendChild(id);
         content.appendChild(actions);
         content.appendChild(info);
 
-        card.appendChild(
-            coverWrap
-        );
-
-        card.appendChild(
-            content
-        );
-
-        container.appendChild(
-            card
-        );
+        card.appendChild(coverWrap);
+        card.appendChild(content);
+        container.appendChild(card);
     }
 }
 
-/*
- * Lista genérica para UPDATE/PATCH múltiplos.
- */
-function openPackageList(titleText, packages) {
-
-    const overlay =
-        document.getElementById(
-            "dlc-overlay"
-        );
-
-    const title =
-        document.getElementById(
-            "dlc-modal-title"
-        );
-
-    const list =
-        document.getElementById(
-            "dlc-list"
-        );
-
-    title.textContent =
-        titleText;
-
-    list.innerHTML = "";
-
-    for (const pkg of packages) {
-
-        const item =
-            document.createElement(
-                "div"
-            );
-
-        item.className =
-            "dlc-item";
-
-        const info =
-            document.createElement(
-                "div"
-            );
-
-        info.className =
-            "dlc-name";
-
-        const name =
-            document.createElement(
-                "p"
-            );
-
-        name.className =
-            "dlc-title";
-
-        name.textContent =
-            pkg.title ||
-            pkg.name ||
-            "PKG";
-
-        const meta =
-            document.createElement(
-                "p"
-            );
-
-        meta.className =
-            "dlc-meta";
-
-        meta.textContent =
-            String(
-                pkg.contentId ||
-                ""
-            ) +
-            " • " +
-            formatSize(
-                pkg.size
-            );
-
-        info.appendChild(name);
-        info.appendChild(meta);
-
-        const button =
-            document.createElement(
-                "button"
-            );
-
-        button.className =
-            "send-button";
-
-        button.type =
-            "button";
-
-        button.textContent =
-            "ENVIAR";
-
-        button.onclick =
-            function() {
-                sendPackage(
-                    pkg,
-                    button
-                );
-            };
-
-        item.appendChild(info);
-        item.appendChild(button);
-
-        list.appendChild(item);
-    }
-
-    overlay.classList.add(
-        "visible"
-    );
-}
-
-/*
- * Carrega catálogo.
- */
 async function loadPackages() {
-
-    const container =
-        document.getElementById(
-            "catalog"
-        );
-
-    container.innerHTML =
-        '<div class="loading">' +
-        'Carregando catálogo...' +
-        '</div>';
+    const container = document.getElementById("catalog");
+    container.innerHTML = '<div class="loading">Carregando catálogo...</div>';
 
     try {
+        const response = await fetch("/api/packages", { cache: "no-store" });
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        const data = await response.json();
 
-        const response =
-            await fetch(
-                "/api/packages",
-                {
-                    cache: "no-store"
-                }
-            );
-
-        if (!response.ok) {
-            throw new Error(
-                "HTTP " +
-                response.status
-            );
-        }
-
-        const data =
-            await response.json();
-
-        /*
-         * Aceitamos tanto:
-         *
-         * { packages: [...] }
-         *
-         * quanto:
-         *
-         * [...]
-         */
-        if (Array.isArray(data)) {
-
-            allPackages = data;
-
-        } else {
-
-            allPackages =
-                Array.isArray(
-                    data.packages
-                )
-                    ? data.packages
-                    : [];
-        }
-
-        games =
-            buildCatalog(
-                allPackages
-            );
-
+        allPackages = Array.isArray(data) ? data : (Array.isArray(data.packages) ? data.packages : []);
+        games = buildCatalog(allPackages);
         renderCatalog();
-
     } catch (error) {
-
-        console.error(
-            "Erro ao carregar catálogo:",
-            error
-        );
-
-        container.innerHTML =
-            '<div class="error">' +
-            'Não foi possível carregar o catálogo.' +
-            '</div>';
+        console.error("Erro ao carregar catálogo:", error);
+        container.innerHTML = '<div class="error">Não foi possível carregar o catálogo.</div>';
     }
 }
 
-/*
- * Pequeno aviso visual.
- */
 function showNotice(message) {
-
-    const notice =
-        document.getElementById(
-            "notice"
-        );
-
-    notice.textContent =
-        message;
-
-    notice.classList.add(
-        "visible"
-    );
-
-    setTimeout(
-        function() {
-
-            notice.classList.remove(
-                "visible"
-            );
-
-        },
-        4000
-    );
+    const notice = document.getElementById("notice");
+    notice.textContent = message;
+    notice.classList.add("visible");
+    setTimeout(() => notice.classList.remove("visible"), 4000);
 }
 
-/*
- * Eventos.
- */
-document
-    .getElementById("search")
-    .addEventListener(
-        "input",
-        renderCatalog
-    );
+document.getElementById("search").addEventListener("input", renderCatalog);
+document.getElementById("refresh").addEventListener("click", async () => {
+    await checkStatus();
+    await loadPackages();
+});
+document.getElementById("dlc-close").addEventListener("click", closeDlc);
+document.getElementById("dlc-overlay").addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) closeDlc();
+});
 
-document
-    .getElementById("refresh")
-    .addEventListener(
-        "click",
-        async function() {
-
-            await checkStatus();
-            await loadPackages();
-        }
-    );
-
-document
-    .getElementById("dlc-close")
-    .addEventListener(
-        "click",
-        closeDlc
-    );
-
-document
-    .getElementById("dlc-overlay")
-    .addEventListener(
-        "click",
-        function(event) {
-
-            if (
-                event.target ===
-                event.currentTarget
-            ) {
-                closeDlc();
-            }
-        }
-    );
-
-/*
- * Inicialização.
- */
-document.addEventListener(
-    "DOMContentLoaded",
-    async function() {
-
-        await checkStatus();
-        await loadPackages();
-    }
-);
+document.addEventListener("DOMContentLoaded", async () => {
+    await checkStatus();
+    await loadPackages();
+});
 </script>
-
 </body>
 </html>
