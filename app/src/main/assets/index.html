@@ -319,7 +319,7 @@
             }
         }
 
-        async function installDPI(pkgId) {
+                async function installDPI(pkgId) {
             const ipInput = document.getElementById('ps4-ip').value.trim();
             
             if (!ipInput) {
@@ -336,9 +336,10 @@
             btn.disabled = true;
 
             try {
+                // Mudamos para POST com cabeçalhos simplificados para o navegador do PS4 não recusar
                 const res = await fetch('/api/install-dpi', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
                     body: JSON.stringify({ ip: ipInput, pkgId: pkgId })
                 });
                 
@@ -348,11 +349,11 @@
                     alert('✅ SUCESSO!\n\n' + data.message);
                     btn.textContent = 'Enviado ✔️';
                 } else {
-                    alert('❌ ERRO DETETADO\n\n' + data.error);
+                    alert('❌ ERRO DO SERVIDOR\n\n' + data.error);
                     btn.textContent = 'Falhou';
                 }
             } catch (e) {
-                alert('⚠️ ERRO DE COMUNICAÇÃO\n\nO servidor Android parou de responder.\nDetalhe: ' + e.message);
+                alert('⚠️ ERRO DE REDE NO PS4\n\nDetalhe: ' + e.message + '\n\nDica: Certifique-se de que o BinLoader (porta 9090) está ativo no GoldHEN.');
                 btn.textContent = 'Erro';
             } finally {
                 if(btn.textContent !== 'Enviado ✔️') {
@@ -363,6 +364,7 @@
                 }
             }
         }
+
     </script>
 </body>
 </html>
