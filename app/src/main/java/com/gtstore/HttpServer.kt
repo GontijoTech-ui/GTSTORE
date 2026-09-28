@@ -22,6 +22,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.StandardCharsets
 import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -54,6 +55,9 @@ class HttpServer(
 
     private val executor = Executors.newCachedThreadPool()
     private val activeConnections = AtomicInteger(0)
+
+    // Cache em memória para guardar o contentId e evitar leituras lentas de disco em ficheiros gigantes
+    private val contentIdCache = ConcurrentHashMap<Int, String>()
 
     // Log em memória, exibido em http://IP:8080/api/log
     private val logLines = Collections.synchronizedList(ArrayList<String>())
@@ -586,6 +590,7 @@ class HttpServer(
         }
     }
 
+    // Manifesto respondido instantaneamente com cache de ContentId
     private fun sendManifestJson(packageId: Int, output: OutputStream, headOnly: Boolean) {
         val packageInfo = getPackages().firstOrNull { it.id == packageId }
         if (packageInfo == null) {
@@ -593,8 +598,13 @@ class HttpServer(
             return
         }
 
-        val meta = PkgMetaReader.read(context, packageInfo.uri)
-        val contentId = meta?.contentId ?: "UP0001-SPSX14001_00-0000000000000000"
+        val contentId = contentIdCache[packageId] ?: run {
+            val meta = try { PkgMetaReader.read(context, packageInfo.uri) } catch (_: Exception) { null }
+            val id = meta?.contentId ?: "UP0001-${packageInfo.name.hashCode().toString().take(9)}_00-0000000000000000"
+            contentIdCache[packageId] = id
+            id
+        }
+
         val fileUrl = "http://$localAddress:$port/pkg/${packageInfo.id}"
 
         val json = """{
@@ -612,6 +622,7 @@ class HttpServer(
             ]
         }"""
 
+        dbg("MANIFEST respondido instantaneamente para id=$packageId com contentId=$contentId")
         sendResponse(output, 200, "OK", "application/json; charset=utf-8", json.toByteArray(StandardCharsets.UTF_8), headOnly, mapOf("Access-Control-Allow-Origin" to "*"))
     }
 
