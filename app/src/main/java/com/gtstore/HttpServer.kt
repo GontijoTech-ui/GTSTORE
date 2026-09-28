@@ -595,18 +595,36 @@ class HttpServer(
         }
     }
 
-    private fun sendManifestJson(packageId: Int, headers: Map<String, String>, output: OutputStream, headOnly: Boolean) {
+        private fun sendManifestJson(packageId: Int, output: OutputStream, headOnly: Boolean) {
         val packageInfo = getPackages().firstOrNull { it.id == packageId }
         if (packageInfo == null) {
-            dbg("manifesto: pacote $packageId não encontrado")
             sendError(output, 404, "Package Not Found")
             return
         }
-        val fileUrl = "http://${requestHost(headers)}:$port/pkg/${packageInfo.id}"
-        val json = """{"originalFileSize":${packageInfo.size},"packageDigest":"0000000000000000000000000000000000000000","numberOfSplitFiles":1,"pieces":[{"url":"$fileUrl","fileOffset":0,"fileSize":${packageInfo.size},"hashValue":"0000000000000000000000000000000000000000"}]}"""
-        dbg("manifesto servido: $json")
+        
+        val fileUrl = "http://$localAddress:$port/pkg/${packageInfo.id}"
+        
+        // ContentID exato obtido dos metadados do teu pacote
+        val contentId = "UP0001-SPSX14001_00-0000000000000000"
+        
+        val json = """{
+            "originalFileSize": ${packageInfo.size},
+            "packageDigest": "0000000000000000000000000000000000000000",
+            "numberOfSplitFiles": 1,
+            "contentId": "$contentId",
+            "pieces": [
+                {
+                    "url": "$fileUrl",
+                    "fileOffset": 0,
+                    "fileSize": ${packageInfo.size},
+                    "hashValue": "0000000000000000000000000000000000000000"
+                }
+            ]
+        }"""
+        
         sendResponse(output, 200, "OK", "application/json; charset=utf-8", json.toByteArray(StandardCharsets.UTF_8), headOnly, mapOf("Access-Control-Allow-Origin" to "*"))
     }
+
 
     private fun servePackage(packageId: Int, headers: Map<String, String>, output: OutputStream, headOnly: Boolean) {
         val packageInfo = getPackages().firstOrNull { it.id == packageId }
