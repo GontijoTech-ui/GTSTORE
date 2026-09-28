@@ -378,7 +378,6 @@ fun Dashboard(
     }
 }
 
-// 3 & 4: PAINEL ADMIN COM BOTÃO DE ENCAMINHAR PARA O WHATSAPP
 @Composable
 fun AdminScreen(
     httpServer: HttpServer,
@@ -457,7 +456,7 @@ fun AdminScreen(
                             )
 
                             val elapsed = System.currentTimeMillis() - req.createdAt
-                            val remaining = ((PIN_TIMEOUT_MS - elapsed) / 1000L).coerceAtLeast(0L)
+                            val remaining = ((HttpServer.PIN_TIMEOUT_MS - elapsed) / 1000L).coerceAtLeast(0L)
 
                             Text(
                                 text = if (req.isExpired) "EXPIRADO" else "${remaining / 60}m ${remaining % 60}s",
@@ -466,7 +465,6 @@ fun AdminScreen(
                             )
                         }
 
-                        // 3: BOTÃO PARA ENCAMINHAR DIRETO PARA O WHATSAPP
                         Button(
                             onClick = {
                                 val sendIntent = Intent(Intent.ACTION_SEND).apply {
