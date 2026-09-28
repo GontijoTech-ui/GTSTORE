@@ -259,7 +259,7 @@ class HttpServer(
                         handleRequest(target, headers, output, headOnly = true, clientIp)
 
                     "POST" ->
-                        handlePostRequest(target, headers, body, output)
+                        handlePostRequest(target, headers, body, output, clientIp)
 
                     "OPTIONS" ->
                         sendOptions(output)
@@ -281,7 +281,7 @@ class HttpServer(
                         sendJsonError(
                             out,
                             500,
-                            "Erro interno do servidor (timeout ou falha ao ler a requisição)."
+                            "Erro interno do servidor."
                         )
                     } else {
                         sendError(out, 500, "Internal Server Error")
@@ -298,7 +298,8 @@ class HttpServer(
         target: String,
         headers: Map<String, String>,
         body: ByteArray,
-        output: OutputStream
+        output: OutputStream,
+        clientIp: String
     ) {
         val uri = Uri.parse(target)
         val path = uri.path ?: "/"
@@ -306,7 +307,7 @@ class HttpServer(
         when (path) {
             "/api/send-payload" -> handleSendPayload(body, output)
             "/api/install" -> handleRemoteInstall(body, output)
-            "/api/install-dpi" -> handleDirectInstallDpi(body, headers, output)
+            "/api/install-dpi" -> handleDirectInstallDpi(body, headers, output, clientIp)
             else -> sendJsonError(output, 404, "POST endpoint not found")
         }
     }
@@ -314,33 +315,59 @@ class HttpServer(
     private fun handleDirectInstallDpi(
         body: ByteArray,
         headers: Map<String, String>,
-        output: OutputStream
+        output: OutputStream,
+        clientIp: String
     ) {
         try {
-            val json = JSONObject(String(body, StandardCharsets.UTF_8))
-            val ps4Ip = json.optString("ip").trim()
+            val json = if (body.isNotEmpty()) {
+                JSONObject(String(body, StandardCharsets.UTF_8))
+            } else {
+                JSONObject()
+            }
+
+            var ps4Ip = json.optString("ip").trim()
+            if (!isValidIp(ps4Ip)) {
+                ps4Ip = clientIp // Fallback automático para o IP conectado ao servidor
+            }
+
             val pkgId = json.optInt("pkgId", -1)
 
             if (!isValidIp(ps4Ip) || pkgId == -1) {
-                sendJsonError(output, 400, "[PASSO 1] IP do PS4 ou ID do PKG inválido.")
+                dbg("PASSO 1 falhou: ip='$ps4Ip' pkgId=$pkgId clientIp='$clientIp'")
+                sendJsonError(
+                    output,
+                    400,
+                    "[PASSO 1] Não foi possível obter o IP do PS4 ou o ID do PKG ($pkgId)."
+                )
                 return
             }
 
             val packageInfo = getPackages().firstOrNull { it.id == pkgId }
             if (packageInfo == null) {
-                sendJsonError(output, 404, "[PASSO 2] Pacote não encontrado na lista.")
+                dbg("PASSO 2 falhou: pkgId=$pkgId não existe")
+                sendJsonError(output, 404, "[PASSO 2] Pacote não encontrado.")
                 return
             }
 
             val meta = metaFor(packageInfo)
             if (meta == null) {
-                sendJsonError(output, 422, "[PASSO 2b] Não consegui ler o param.sfo deste PKG (${packageInfo.fileName}).")
+                dbg("PASSO 2b falhou: param.sfo ilegível em ${packageInfo.fileName}")
+                sendJsonError(
+                    output,
+                    422,
+                    "[PASSO 2b] Não consegui ler o param.sfo deste PKG (${packageInfo.fileName})."
+                )
                 return
             }
 
             val payloadTemplate = loadPayload("payload.bin") ?: loadPayload("direct-installer.bin")
             if (payloadTemplate == null) {
-                sendJsonError(output, 500, "[PASSO 3] Ficheiro payload.bin não encontrado na pasta assets/payloads.")
+                dbg("PASSO 3 falhou: payload.bin ausente em assets/$PAYLOAD_DIR")
+                sendJsonError(
+                    output,
+                    500,
+                    "[PASSO 3] Ficheiro payload.bin não encontrado na pasta assets."
+                )
                 return
             }
 
@@ -353,13 +380,22 @@ class HttpServer(
             )
 
             if (off < 0) {
-                sendJsonError(output, 500, "[PASSO 4] Marcador B4 não encontrado.")
+                dbg("PASSO 4 falhou: marcador B4 ausente")
+                sendJsonError(
+                    output,
+                    500,
+                    "[PASSO 4] Marcador B4 não encontrado no payload.bin."
+                )
                 return
             }
 
             val localIp = requestHost(headers)
             if (localIp == "0.0.0.0" || localIp.isEmpty()) {
-                sendJsonError(output, 500, "[PASSO 5] O telemóvel não conseguiu ler o seu próprio IP.")
+                sendJsonError(
+                    output,
+                    500,
+                    "[PASSO 5] O Android não conseguiu identificar seu IP local na rede Wi-Fi."
+                )
                 return
             }
 
@@ -375,33 +411,55 @@ class HttpServer(
                     payload[off + 4] = (callbackPort ushr 8).toByte()
                     payload[off + 5] = callbackPort.toByte()
 
+                    dbg("Enviando payload para o PS4 ($ps4Ip:9090)...")
                     val binResult = sendPayloadToBinLoader(ps4Ip, payload)
                     if (!binResult.success) {
-                        sendJsonError(output, 502, "[PASSO 6] Falha ao enviar para o BinLoader (Porta 9090): ${binResult.error}")
+                        dbg("PASSO 6 falhou: ${binResult.error}")
+                        sendJsonError(
+                            output,
+                            502,
+                            "[PASSO 6] Falha ao enviar para o BinLoader ($ps4Ip:9090). O BinLoader está ativo no GoldHEN?\nDetalhe: ${binResult.error}"
+                        )
                         return
                     }
 
+                    dbg("Payload enviado com sucesso. Aguardando conexão de volta do PS4...")
                     try {
                         tempServer.accept().use { ps4Client ->
+                            dbg("PS4 conectou de volta. Enviando informações do manifesto...")
                             ps4Client.getOutputStream().apply {
                                 write(buildDpiInfo(manifestUrl, packageInfo, meta))
                                 flush()
                             }
                         }
 
+                        dbg("Instalação engatilhada com sucesso no PS4!")
                         sendJson(
                             output,
                             200,
-                            JSONObject().put("success", true).put("message", "Instalação DPI iniciada no PS4!")
+                            JSONObject()
+                                .put("success", true)
+                                .put("message", "Instalação iniciada! O download aparecerá na fila do PS4.")
                         )
                     } catch (e: Exception) {
-                        sendJsonError(output, 504, "[PASSO 7] Timeout na resposta do PS4: ${e.message}")
+                        dbg("PASSO 7 falhou: $e")
+                        sendJsonError(
+                            output,
+                            504,
+                            "[PASSO 7] Timeout: O PS4 recebeu o payload, mas não retornou a conexão.\nDetalhe: ${e.message}"
+                        )
                     }
                 }
             } catch (e: Exception) {
-                sendJsonError(output, 500, "[PASSO 8] Falha ao abrir porta de escuta local: ${e.message}")
+                dbg("PASSO 8 falhou: $e")
+                sendJsonError(
+                    output,
+                    500,
+                    "[PASSO 8] Falha ao abrir porta temporária no Android.\nDetalhe: ${e.message}"
+                )
             }
         } catch (e: Exception) {
+            dbg("PASSO 9 falhou: $e")
             sendJsonError(output, 400, "[PASSO 9] Erro geral: ${e.message}")
         }
     }
@@ -483,7 +541,7 @@ class HttpServer(
 
             val payload = loadPayload(payloadName)
             if (payload == null) {
-                sendJsonError(output, 404, "Payload não encontrado em assets/$PAYLOAD_DIR.")
+                sendJsonError(output, 404, "Payload não encontrado em assets.")
                 return
             }
 
@@ -534,20 +592,23 @@ class HttpServer(
     }
 
     private fun loadPayload(payloadName: String): ByteArray? {
-        return try {
-            context.assets.open("$PAYLOAD_DIR/$payloadName").use { input ->
-                val output = ByteArrayOutputStream()
-                val buffer = ByteArray(BUFFER_SIZE)
-                while (true) {
-                    val read = input.read(buffer)
-                    if (read <= 0) break
-                    output.write(buffer, 0, read)
+        val targets = listOf("$PAYLOAD_DIR/$payloadName", payloadName)
+        for (target in targets) {
+            try {
+                context.assets.open(target).use { input ->
+                    val output = ByteArrayOutputStream()
+                    val buffer = ByteArray(BUFFER_SIZE)
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read <= 0) break
+                        output.write(buffer, 0, read)
+                    }
+                    return output.toByteArray()
                 }
-                output.toByteArray()
+            } catch (_: Exception) {
             }
-        } catch (_: Exception) {
-            null
         }
+        return null
     }
 
     private fun handleRemoteInstall(body: ByteArray, output: OutputStream) {
@@ -880,11 +941,6 @@ class HttpServer(
         )
     }
 
-    /**
-     * ============================================================
-     * TRANSFERÊNCIA DO PKG (HTTP 206 Partial Content / Range)
-     * ============================================================
-     */
     private fun servePackage(
         packageId: Int,
         headers: Map<String, String>,
@@ -1035,10 +1091,6 @@ class HttpServer(
         return bytesToSend - remaining
     }
 
-    // ============================================================
-    // CACHE DOS PKGS
-    // ============================================================
-
     @Volatile
     private var pkgCache: List<PackageInfo> = emptyList()
 
@@ -1126,11 +1178,6 @@ class HttpServer(
         }
     }
 
-    /**
-     * ============================================================
-     * API DO CATÁLOGO (Baseado exclusivamente no param.sfo)
-     * ============================================================
-     */
     private fun sendPackagesJson(output: OutputStream, headOnly: Boolean) {
         val packages = getPackages(force = true)
 
