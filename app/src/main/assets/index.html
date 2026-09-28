@@ -14,6 +14,7 @@
             --text-muted: #aaaaaa;
             --danger: #e53935;
             --success: #4caf50;
+            --warning: #ff9800;
         }
 
         body {
@@ -53,6 +54,13 @@
             border-radius: 10px;
             margin-bottom: 20px;
             display: flex;
+            flex-direction: column;
+            gap: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .config-row {
+            display: flex;
             flex-wrap: wrap;
             gap: 15px;
             align-items: center;
@@ -68,6 +76,7 @@
 
         .input-group label {
             font-weight: bold;
+            white-space: nowrap;
         }
 
         .input-group input {
@@ -80,21 +89,37 @@
             flex-grow: 1;
         }
 
-        #status-indicator {
+        .status-badge {
             padding: 8px 15px;
             border-radius: 20px;
             font-size: 14px;
             font-weight: bold;
             background-color: #333;
+            text-align: center;
         }
 
         .status-online { background-color: var(--success) !important; }
         .status-offline { background-color: var(--danger) !important; }
+        .status-scanning { background-color: var(--warning) !important; color: #000; }
+
+        .btn-scan {
+            background-color: #444;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        .btn-scan:hover { background-color: #555; }
 
         .pkg-list {
             display: flex;
             flex-direction: column;
             gap: 15px;
+            margin-bottom: 40px;
         }
 
         .pkg-card {
@@ -104,6 +129,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
             transition: transform 0.2s;
         }
 
@@ -133,30 +159,11 @@
             cursor: pointer;
             font-weight: bold;
             transition: background-color 0.2s;
+            white-space: nowrap;
         }
 
-        .btn:hover {
-            background-color: var(--primary-hover);
-        }
-
-        .btn:disabled {
-            background-color: #555;
-            cursor: not-allowed;
-        }
-
-        .toast {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: #333;
-            color: white;
-            padding: 15px 25px;
-            border-radius: 5px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            display: none;
-            z-index: 1000;
-        }
+        .btn:hover { background-color: var(--primary-hover); }
+        .btn:disabled { background-color: #555; cursor: not-allowed; }
     </style>
 </head>
 <body>
@@ -167,40 +174,34 @@
 
     <div class="container">
         <div class="config-panel">
-            <div class="input-group">
-                <label for="ps4-ip">IP do PS4:</label>
-                <input type="text" id="ps4-ip" placeholder="Ex: 192.168.1.50">
+            <div class="config-row">
+                <div class="input-group">
+                    <label for="ps4-ip">IP do PS4:</label>
+                    <input type="text" id="ps4-ip" placeholder="A detetar automaticamente...">
+                </div>
+                <button class="btn-scan" onclick="autoDetectPs4Ip()">🔍 Procurar IP</button>
             </div>
-            <div id="status-indicator">Verificando Servidor...</div>
+            <div id="status-indicator" class="status-badge">A verificar servidor Android...</div>
         </div>
 
         <div id="pkg-container" class="pkg-list">
-            <!-- Os jogos vão aparecer aqui -->
             <p style="text-align: center; color: #aaa;">A carregar pacotes...</p>
         </div>
     </div>
 
-    <div id="toast" class="toast">Mensagem do sistema</div>
-
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // Recupera o IP guardado da última sessão
+            // 1. Recupera IP guardado anteriormente
             const savedIp = localStorage.getItem('gtstore_ps4_ip');
             if (savedIp) {
                 document.getElementById('ps4-ip').value = savedIp;
+            } else {
+                autoDetectPs4Ip(); // Tenta detetar ao abrir se não houver salvo
             }
 
             checkStatus();
             loadPackages();
         });
-
-        function showToast(message, isError = false) {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.style.backgroundColor = isError ? '#e53935' : '#4caf50';
-            toast.style.display = 'block';
-            setTimeout(() => { toast.style.display = 'none'; }, 4000);
-        }
 
         async function checkStatus() {
             const indicator = document.getElementById('status-indicator');
@@ -208,12 +209,12 @@
                 const res = await fetch('/api/status');
                 const data = await res.json();
                 if (data.online) {
-                    indicator.textContent = 'Servidor Online (' + data.localAddress + ':' + data.port + ')';
-                    indicator.className = 'status-online';
+                    indicator.textContent = 'Servidor Android Online (' + data.localAddress + ':' + data.port + ')';
+                    indicator.className = 'status-badge status-online';
                 }
             } catch (e) {
-                indicator.textContent = 'Servidor Offline';
-                indicator.className = 'status-offline';
+                indicator.textContent = 'Servidor Android Offline';
+                indicator.className = 'status-badge status-offline';
             }
         }
 
@@ -223,10 +224,10 @@
                 const res = await fetch('/api/packages');
                 const data = await res.json();
                 
-                container.innerHTML = ''; // Limpa a lista
+                container.innerHTML = '';
                 
                 if (data.count === 0) {
-                    container.innerHTML = '<p style="text-align: center;">Nenhum PKG encontrado na pasta selecionada.</p>';
+                    container.innerHTML = '<p style="text-align: center; color: #aaa;">Nenhum PKG encontrado na pasta selecionada no Android.</p>';
                     return;
                 }
 
@@ -236,15 +237,85 @@
                     card.innerHTML = `
                         <div class="pkg-info">
                             <h3>${pkg.name}</h3>
-                            <p>Tamanho: ${pkg.formattedSize} | Tipo: ${pkg.type}</p>
+                            <p>Tamanho: ${pkg.formattedSize}</p>
                         </div>
                         <button class="btn" id="btn-${pkg.id}" onclick="installDPI(${pkg.id})">Instalar no PS4</button>
                     `;
                     container.appendChild(card);
                 });
             } catch (e) {
-                container.innerHTML = '<p style="text-align: center; color: #e53935;">Erro ao carregar os pacotes.</p>';
-                console.error(e);
+                container.innerHTML = '<p style="text-align: center; color: #e53935;">Erro ao carregar a lista de pacotes.</p>';
+            }
+        }
+
+        // --- SISTEMA DE RECONHECIMENTO AUTOMÁTICO DO IP DO PS4 ---
+        async function autoDetectPs4Ip() {
+            const ipInput = document.getElementById('ps4-ip');
+            const indicator = document.getElementById('status-indicator');
+            
+            // Se o navegador foi aberto no próprio PS4, o IP do cliente é o do PS4!
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                if (data.clientIp && data.clientIp !== "127.0.0.1" && data.clientIp !== data.localAddress) {
+                    ipInput.value = data.clientIp;
+                    localStorage.setItem('gtstore_ps4_ip', data.clientIp);
+                    return;
+                }
+            } catch (e) {}
+
+            // Caso contrário, tenta descobrir o gateway/sub-rede com base no IP do telemóvel
+            indicator.textContent = 'A procurar PS4 na rede local...';
+            indicator.className = 'status-badge status-scanning';
+
+            try {
+                const statusRes = await fetch('/api/status');
+                const statusData = await statusRes.json();
+                const androidIp = statusData.localAddress; // Ex: 192.168.1.15
+
+                if (!androidIp || androidIp === '0.0.0.0') {
+                    indicator.className = 'status-badge status-online';
+                    return;
+                }
+
+                const subnet = androidIp.substring(0, androidIp.lastIndexOf('.') + 1);
+                
+                // IPs comuns de PS4 na rede doméstica para testar rapidamente em paralelo
+                const commonHosts = [50, 100, 101, 102, 103, 104, 105, 110, 150, 200];
+                let found = false;
+
+                for (let host of commonHosts) {
+                    const testIp = subnet + host;
+                    if (testIp === androidIp) continue;
+
+                    try {
+                        // Tenta testar a porta do BinLoader (9090) do PS4 usando um pedido rápido de imagem/fetch com timeout curto
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 400);
+
+                        await fetch(`http://${testIp}:9090`, { mode: 'no-cors', signal: controller.signal });
+                        clearTimeout(timeoutId);
+
+                        // Se respondeu ou rejeitou por CORS mas abriu ligação, encontramos o PS4!
+                        ipInput.value = testIp;
+                        localStorage.setItem('gtstore_ps4_ip', testIp);
+                        found = true;
+                        break;
+                    } catch (err) {
+                        // Continua a procurar
+                    }
+                }
+
+                if (found) {
+                    indicator.textContent = 'PS4 detetado com sucesso!';
+                    indicator.className = 'status-badge status-online';
+                } else {
+                    indicator.textContent = 'PS4 não detetado automaticamente. Insira o IP manualmente.';
+                    indicator.className = 'status-badge status-online';
+                }
+            } catch (e) {
+                indicator.textContent = 'Servidor Android Online';
+                indicator.className = 'status-badge status-online';
             }
         }
 
@@ -252,17 +323,16 @@
             const ipInput = document.getElementById('ps4-ip').value.trim();
             
             if (!ipInput) {
-                showToast('Por favor, insira o IP do seu PS4.', true);
+                alert('AVISO: Por favor, insira o IP do seu PS4.');
                 document.getElementById('ps4-ip').focus();
                 return;
             }
 
-            // Guarda o IP para a próxima vez
             localStorage.setItem('gtstore_ps4_ip', ipInput);
 
             const btn = document.getElementById(`btn-${pkgId}`);
             const originalText = btn.textContent;
-            btn.textContent = 'Injetando...';
+            btn.textContent = 'A injetar...';
             btn.disabled = true;
 
             try {
@@ -275,21 +345,22 @@
                 const data = await res.json();
                 
                 if (data.success) {
-                    showToast(data.message || 'Instalação iniciada! Verifique o ecrã do PS4.');
+                    alert('✅ SUCESSO!\n\n' + data.message);
                     btn.textContent = 'Enviado ✔️';
+                } else {
+                    alert('❌ ERRO DETETADO\n\n' + data.error);
+                    btn.textContent = 'Falhou';
+                }
+            } catch (e) {
+                alert('⚠️ ERRO DE COMUNICAÇÃO\n\nO servidor Android parou de responder.\nDetalhe: ' + e.message);
+                btn.textContent = 'Erro';
+            } finally {
+                if(btn.textContent !== 'Enviado ✔️') {
                     setTimeout(() => {
                         btn.textContent = originalText;
                         btn.disabled = false;
-                    }, 5000);
-                } else {
-                    showToast('Erro: ' + data.error, true);
-                    btn.textContent = 'Falhou';
-                    btn.disabled = false;
+                    }, 3000);
                 }
-            } catch (e) {
-                showToast('Falha ao comunicar com o servidor GTStore.', true);
-                btn.textContent = 'Erro';
-                btn.disabled = false;
             }
         }
     </script>
