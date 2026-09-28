@@ -38,6 +38,7 @@ class HttpServer(
         private const val SOCKET_TIMEOUT_MS = 60_000
         private const val PAYLOAD_DIR = "payloads"
         private const val MAX_LOG_LINES = 300
+        private const val PACKAGES_CACHE_MS = 8_000L
 
         private val ALLOWED_PAYLOADS = setOf(
             "rpi_installer.bin",
@@ -56,10 +57,15 @@ class HttpServer(
     private val executor = Executors.newCachedThreadPool()
     private val activeConnections = AtomicInteger(0)
 
-    // Cache em memória para guardar o contentId e evitar leituras lentas de disco em ficheiros gigantes
+    // Cache em memória para contentId
     private val contentIdCache = ConcurrentHashMap<Int, String>()
 
-    // Log em memória, exibido em http://IP:8080/api/log
+    // Cache da lista de pacotes + mapa de lookup rápido
+    private var cachedPackages: List<PackageInfo> = emptyList()
+    private var packagesCacheTime = 0L
+    private val packageById = ConcurrentHashMap<Int, PackageInfo>()
+
+    // Log em memória
     private val logLines = Collections.synchronizedList(ArrayList<String>())
 
     private fun dbg(msg: String) {
@@ -144,6 +150,15 @@ class HttpServer(
         )
     }
 
+    /** Chame este método sempre que o usuário trocar a pasta de PKGs */
+    fun invalidatePackagesCache() {
+        cachedPackages = emptyList()
+        packagesCacheTime = 0L
+        packageById.clear()
+        contentIdCache.clear()
+        dbg("cache de pacotes invalidado")
+    }
+
     private fun handleClient(socket: Socket) {
         activeConnections.incrementAndGet()
 
@@ -188,7 +203,7 @@ class HttpServer(
                 }
 
                 if (!target.startsWith("/api/log")) {
-                    dbg("$clientIp $method $target range=${headers["range"]} ua=${headers["user-agent"]}")
+                    dbg("$clientIp $method \( target range= \){headers["range"]} ua=${headers["user-agent"]}")
                 }
 
                 val contentLength = headers["content-length"]?.toIntOrNull() ?: 0
@@ -258,7 +273,7 @@ class HttpServer(
                 return
             }
 
-            val packageInfo = getPackages().firstOrNull { it.id == pkgId }
+            val packageInfo = packageById[pkgId] ?: getPackages().firstOrNull { it.id == pkgId }
             if (packageInfo == null) {
                 dbg("PASSO 2 falhou: pkgId=$pkgId não existe")
                 sendJsonError(output, 404, "[PASSO 2] Pacote não encontrado na lista.")
@@ -271,7 +286,7 @@ class HttpServer(
                 sendJsonError(output, 422, "[PASSO 2b] Não consegui ler o param.sfo deste PKG (${packageInfo.fileName}).")
                 return
             }
-            dbg("meta: title=${meta.title} id=${meta.contentId} cat=${meta.category} type=${meta.bgftType} icon=${meta.icon?.size ?: 0}B size=${packageInfo.size}")
+            dbg("meta: title=\( {meta.title} id= \){meta.contentId} cat=\( {meta.category} type= \){meta.bgftType} icon=\( {meta.icon?.size ?: 0}B size= \){packageInfo.size}")
 
             val payloadTemplate = loadPayload("payload.bin") ?: loadPayload("direct-installer.bin")
             if (payloadTemplate == null) {
@@ -295,7 +310,7 @@ class HttpServer(
                 return
             }
 
-            val manifestUrl = "http://$localIp:$port/json/${packageInfo.id}.json"
+            val manifestUrl = "http://$localIp:\( port/json/ \){packageInfo.id}.json"
             val localAddr = java.net.InetAddress.getByName(localIp)
 
             try {
@@ -590,10 +605,10 @@ class HttpServer(
         }
     }
 
-    // Manifesto respondido instantaneamente com cache de ContentId
     private fun sendManifestJson(packageId: Int, output: OutputStream, headOnly: Boolean) {
-        val packageInfo = getPackages().firstOrNull { it.id == packageId }
+        val packageInfo = packageById[packageId] ?: getPackages().firstOrNull { it.id == packageId }
         if (packageInfo == null) {
+            dbg("MANIFEST: pacote $packageId não encontrado")
             sendError(output, 404, "Package Not Found")
             return
         }
@@ -605,7 +620,7 @@ class HttpServer(
             id
         }
 
-        val fileUrl = "http://$localAddress:$port/pkg/${packageInfo.id}"
+        val fileUrl = "http://$localAddress:\( port/pkg/ \){packageInfo.id}"
 
         val json = """{
             "originalFileSize": ${packageInfo.size},
@@ -622,14 +637,17 @@ class HttpServer(
             ]
         }"""
 
-        dbg("MANIFEST respondido instantaneamente para id=$packageId com contentId=$contentId")
-        sendResponse(output, 200, "OK", "application/json; charset=utf-8", json.toByteArray(StandardCharsets.UTF_8), headOnly, mapOf("Access-Control-Allow-Origin" to "*"))
+        dbg("MANIFEST id=$packageId contentId=\( contentId size= \){packageInfo.size}")
+        sendResponse(output, 200, "OK", "application/json; charset=utf-8",
+            json.toByteArray(StandardCharsets.UTF_8), headOnly,
+            mapOf("Access-Control-Allow-Origin" to "*"))
     }
 
     private fun servePackage(packageId: Int, headers: Map<String, String>, output: OutputStream, headOnly: Boolean) {
-        val packageInfo = getPackages().firstOrNull { it.id == packageId }
+        val packageInfo = packageById[packageId] ?: getPackages().firstOrNull { it.id == packageId }
+
         if (packageInfo == null) {
-            dbg("pkg: pacote $packageId não encontrado")
+            dbg("pkg: pacote $packageId NÃO encontrado (total na lista: ${packageById.size})")
             sendError(output, 404, "Package Not Found")
             return
         }
@@ -711,7 +729,8 @@ class HttpServer(
             responseHeaders["Content-Range"] = "bytes $start-$end/$totalSize"
         }
 
-        dbg("pkg $packageId: HTTP $statusCode bytes $start-$end/$totalSize (headOnly=$headOnly)")
+        dbg("pkg \( packageId ( \){packageInfo.fileName}): HTTP $statusCode  bytes $start-$end/$totalSize  headOnly=$headOnly")
+
         writeHeaders(output, statusCode, statusText, responseHeaders)
 
         if (headOnly || contentLength <= 0L) {
@@ -719,21 +738,34 @@ class HttpServer(
             return
         }
 
+        val startTime = System.currentTimeMillis()
         var sent = 0L
+
         try {
             context.contentResolver.openInputStream(packageInfo.uri)?.use { inputStream ->
                 BufferedInputStream(inputStream, BUFFER_SIZE).use { bufferedInput ->
                     if (start > 0) {
+                        val skipStart = System.currentTimeMillis()
                         skipFully(bufferedInput, start)
+                        val skipMs = System.currentTimeMillis() - skipStart
+                        if (skipMs > 800) {
+                            dbg("pkg $packageId: skip de $start bytes demorou ${skipMs}ms (SAF lento)")
+                        }
                     }
                     sent = streamRange(bufferedInput, output, contentLength)
                 }
+            } ?: run {
+                dbg("pkg $packageId: openInputStream retornou null")
+                return
             }
-            dbg("pkg $packageId: enviados $sent de $contentLength bytes com sucesso")
+
+            val elapsed = System.currentTimeMillis() - startTime
+            val speed = if (elapsed > 0) (sent * 1000 / elapsed / 1024) else 0
+            dbg("pkg $packageId: enviados $sent de $contentLength bytes em \( {elapsed}ms (\~ \){speed} KB/s)")
         } catch (e: SocketException) {
-            dbg("pkg $packageId: conexão encerrada pelo PS4 após $sent bytes")
+            dbg("pkg $packageId: conexão encerrada pelo cliente após $sent bytes")
         } catch (e: Exception) {
-            dbg("pkg $packageId: erro ao ler/enviar: $e")
+            dbg("pkg $packageId: erro ao ler/enviar: ${e.javaClass.simpleName} - ${e.message}")
         }
 
         try { output.flush() } catch (_: Exception) {}
@@ -769,32 +801,65 @@ class HttpServer(
     }
 
     private fun getPackages(): List<PackageInfo> {
+        val now = System.currentTimeMillis()
+        if (cachedPackages.isNotEmpty() && (now - packagesCacheTime) < PACKAGES_CACHE_MS) {
+            return cachedPackages
+        }
+
         val preferences = context.getSharedPreferences("GTSTORE", Context.MODE_PRIVATE)
         val savedUri = preferences.getString("pkg_folder_uri", null)
             ?: context.getSharedPreferences("GTSTORE_PREFS", Context.MODE_PRIVATE)
                 .getString("pkg_folder_uri", null)
 
-        if (savedUri.isNullOrBlank()) return emptyList()
+        if (savedUri.isNullOrBlank()) {
+            cachedPackages = emptyList()
+            packageById.clear()
+            return emptyList()
+        }
 
         val root = try {
             DocumentFile.fromTreeUri(context, Uri.parse(savedUri))
-        } catch (_: Exception) { null }
+        } catch (_: Exception) {
+            null
+        }
 
-        if (root == null || !root.exists()) return emptyList()
+        if (root == null || !root.exists()) {
+            cachedPackages = emptyList()
+            packageById.clear()
+            return emptyList()
+        }
 
         val files = mutableListOf<DocumentFile>()
         scanDocumentFile(root, files)
 
-        return files.filter { it.isFile && it.name?.lowercase()?.endsWith(".pkg") == true }
+        val list = files
+            .filter { it.isFile && it.name?.lowercase()?.endsWith(".pkg") == true }
             .sortedBy { it.name?.lowercase() ?: "" }
-            .mapIndexed { index, file ->
+            .map { file ->
                 val name = file.name ?: "package.pkg"
+                val stableId = stableIdFor(file)
                 PackageInfo(
-                    id = index + 1, name = name, fileName = name,
-                    size = file.length(), modified = file.lastModified(),
-                    type = "PKG", uri = file.uri
+                    id = stableId,
+                    name = name,
+                    fileName = name,
+                    size = file.length(),
+                    modified = file.lastModified(),
+                    type = "PKG",
+                    uri = file.uri
                 )
             }
+
+        packageById.clear()
+        list.forEach { packageById[it.id] = it }
+
+        cachedPackages = list
+        packagesCacheTime = now
+        return list
+    }
+
+    private fun stableIdFor(file: DocumentFile): Int {
+        val key = "\( {file.uri}| \){file.length()}|${file.lastModified()}"
+        return key.hashCode() and 0x7FFFFFFF
     }
 
     private fun scanDocumentFile(root: DocumentFile, result: MutableList<DocumentFile>) {
@@ -816,7 +881,7 @@ class HttpServer(
                 .put("id", pkg.id).put("name", pkg.name).put("file", pkg.fileName)
                 .put("size", pkg.size).put("formattedSize", formatFileSize(pkg.size))
                 .put("modified", pkg.modified).put("type", pkg.type)
-                .put("url", "/pkg/${pkg.id}").put("download", "/download?id=${pkg.id}")
+                .put("url", "/pkg/\( {pkg.id}").put("download", "/download?id= \){pkg.id}")
             array.put(item)
         }
         val json = JSONObject().put("count", packages.size).put("packages", array)
@@ -861,7 +926,12 @@ class HttpServer(
     }
 
     private fun sendOptions(output: OutputStream) {
-        writeHeaders(output, 204, "No Content", mapOf("Access-Control-Allow-Origin" to "*", "Access-Control-Allow-Methods" to "GET, HEAD, POST, OPTIONS", "Access-Control-Allow-Headers" to "Content-Type", "Content-Length" to "0"))
+        writeHeaders(output, 204, "No Content", mapOf(
+            "Access-Control-Allow-Origin" to "*",
+            "Access-Control-Allow-Methods" to "GET, HEAD, POST, OPTIONS",
+            "Access-Control-Allow-Headers" to "Content-Type",
+            "Content-Length" to "0"
+        ))
         output.flush()
     }
 
@@ -874,7 +944,15 @@ class HttpServer(
         sendJson(output, statusCode, JSONObject().put("success", false).put("error", message))
     }
 
-    private fun sendResponse(output: OutputStream, statusCode: Int, statusText: String, contentType: String, body: ByteArray, headOnly: Boolean, extraHeaders: Map<String, String> = emptyMap()) {
+    private fun sendResponse(
+        output: OutputStream,
+        statusCode: Int,
+        statusText: String,
+        contentType: String,
+        body: ByteArray,
+        headOnly: Boolean,
+        extraHeaders: Map<String, String> = emptyMap()
+    ) {
         val headers = LinkedHashMap<String, String>()
         headers["Content-Type"] = contentType
         headers["Content-Length"] = body.size.toString()
@@ -886,27 +964,40 @@ class HttpServer(
     }
 
     private fun writeHeaders(output: OutputStream, statusCode: Int, statusText: String, headers: Map<String, String>) {
-        val builder = StringBuilder().append("HTTP/1.1 ").append(statusCode).append(" ").append(statusText).append("\r\n").append("Server: GTSTORE\r\n").append("Connection: close\r\n")
-        for (entry in headers) builder.append(entry.key).append(": ").append(entry.value).append("\r\n")
+        val builder = StringBuilder()
+            .append("HTTP/1.1 ").append(statusCode).append(" ").append(statusText).append("\r\n")
+            .append("Server: GTSTORE\r\n")
+            .append("Connection: close\r\n")
+        for (entry in headers) {
+            builder.append(entry.key).append(": ").append(entry.value).append("\r\n")
+        }
         builder.append("\r\n")
         output.write(builder.toString().toByteArray(StandardCharsets.UTF_8))
     }
 
     private fun sendError(output: OutputStream, statusCode: Int, message: String, extraHeaders: Map<String, String> = emptyMap()) {
-        val body = "<!DOCTYPE html><html lang=\"pt-BR\"><head><meta charset=\"UTF-8\"><title>$statusCode</title></head><body><h1>$statusCode</h1><p>${escapeHtml(message)}</p></body></html>".toByteArray(StandardCharsets.UTF_8)
+        val body = "<!DOCTYPE html><html lang=\"pt-BR\"><head><meta charset=\"UTF-8\"><title>$statusCode</title></head><body><h1>\( statusCode</h1><p> \){escapeHtml(message)}</p></body></html>".toByteArray(StandardCharsets.UTF_8)
         sendResponse(output, statusCode, message, "text/html; charset=utf-8", body, false, extraHeaders)
     }
 
     private fun sendRangeError(output: OutputStream, totalSize: Long) {
         dbg("pkg: Range inválido/insatisfazível (tamanho $totalSize)")
-        sendError(output, 416, "Range Not Satisfiable", mapOf("Content-Range" to "bytes */$totalSize", "Accept-Ranges" to "bytes", "Access-Control-Allow-Origin" to "*"))
+        sendError(output, 416, "Range Not Satisfiable", mapOf(
+            "Content-Range" to "bytes */$totalSize",
+            "Accept-Ranges" to "bytes",
+            "Access-Control-Allow-Origin" to "*"
+        ))
     }
 
     private fun getWifiIpv4Address(): Inet4Address? {
         return try {
-            Collections.list(NetworkInterface.getNetworkInterfaces()).flatMap { Collections.list(it.inetAddresses) }
-                .filterIsInstance<Inet4Address>().firstOrNull { !it.isLoopbackAddress && !it.isLinkLocalAddress }
-        } catch (_: Exception) { null }
+            Collections.list(NetworkInterface.getNetworkInterfaces())
+                .flatMap { Collections.list(it.inetAddresses) }
+                .filterIsInstance<Inet4Address>()
+                .firstOrNull { !it.isLoopbackAddress && !it.isLinkLocalAddress }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun formatFileSize(bytes: Long): String {
@@ -914,10 +1005,20 @@ class HttpServer(
         val units = arrayOf("B", "KB", "MB", "GB", "TB")
         var value = bytes.toDouble()
         var index = 0
-        while (value >= 1024 && index < units.lastIndex) { value /= 1024; index++ }
+        while (value >= 1024 && index < units.lastIndex) {
+            value /= 1024
+            index++
+        }
         return if (index == 0) "${value.toLong()} ${units[index]}" else String.format("%.2f %s", value, units[index])
     }
 
-    private fun sanitizeFileName(name: String): String = name.replace("\"", "").replace("\r", "").replace("\n", "_")
-    private fun escapeHtml(text: String): String = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#39;")
+    private fun sanitizeFileName(name: String): String =
+        name.replace("\"", "").replace("\r", "").replace("\n", "_")
+
+    private fun escapeHtml(text: String): String =
+        text.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&#39;")
 }
