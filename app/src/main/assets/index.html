@@ -6,47 +6,58 @@
     <title>GTSTORE</title>
     <style>
         :root {
-            --bg: #0b0d10;
-            --panel: #15181d;
-            --panel-2: #1b1f25;
-            --border: #292e36;
+            --bg: #000000;
+            --panel: #0d0d0d;
+            --panel-card: #121212;
+            --panel-card-hover: #181818;
+            --border: #222222;
             --primary: #0070cc;
             --primary-hover: #0088f0;
             --text: #ffffff;
-            --muted: #a8adb5;
+            --muted: #888888;
             --green: #35c759;
             --orange: #ff9f0a;
             --red: #ff453a;
         }
 
-        * { box-sizing: border-box; }
-        html, body { margin: 0; padding: 0; min-height: 100%; }
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            min-height: 100%;
+            background-color: var(--bg);
+        }
 
         body {
-            background: var(--bg);
+            background-color: #000000;
             color: var(--text);
             font-family: Arial, Helvetica, sans-serif;
         }
 
-        button { font-family: inherit; }
+        button, input {
+            font-family: inherit;
+        }
 
         .header {
             width: 100%;
-            background: #101318;
+            background: #000000;
             border-bottom: 1px solid var(--border);
-            padding: 18px 14px 20px;
+            padding: 20px 16px;
             text-align: center;
         }
 
         .logo {
             display: block;
-            width: 150px;
+            width: 140px;
             max-width: 60%;
             height: auto;
-            max-height: 90px;
+            max-height: 85px;
             object-fit: contain;
             margin: 0 auto 10px;
-            border-radius: 12px;
+            border-radius: 10px;
         }
 
         .brand {
@@ -57,164 +68,200 @@
         }
 
         .subtitle {
-            margin: 7px 0 0;
+            margin: 6px 0 0;
             color: var(--muted);
             font-size: 13px;
         }
 
+        /* BADGE DE STATUS ON / OFF */
         .server-status {
             display: inline-flex;
             align-items: center;
-            gap: 7px;
+            gap: 8px;
             margin-top: 12px;
-            padding: 7px 12px;
+            padding: 6px 14px;
             border-radius: 20px;
-            background: #20242a;
+            background: #141414;
+            border: 1px solid #222;
             color: var(--muted);
             font-size: 12px;
+            transition: all 0.3s ease;
         }
 
         .status-dot {
-            width: 8px;
-            height: 8px;
+            width: 9px;
+            height: 9px;
             border-radius: 50%;
             background: var(--orange);
+            transition: background-color 0.3s ease;
         }
 
-        .status-online .status-dot { background: var(--green); }
-        .status-offline .status-dot { background: var(--red); }
+        .status-online {
+            border-color: rgba(53, 199, 89, 0.3);
+            color: #d1d1d1;
+        }
+        .status-online .status-dot {
+            background: var(--green);
+            box-shadow: 0 0 8px var(--green);
+        }
+
+        .status-offline {
+            border-color: rgba(255, 69, 58, 0.4);
+            color: #ff817a;
+        }
+        .status-offline .status-dot {
+            background: var(--red);
+            box-shadow: 0 0 8px var(--red);
+        }
 
         .container {
-            width: 94%;
-            max-width: 1000px;
+            width: 95%;
+            max-width: 1400px;
             margin: 0 auto;
-            padding: 20px 0 50px;
+            padding: 24px 0 60px;
         }
 
         .toolbar {
             display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
+            gap: 12px;
             align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: 24px;
         }
 
         .search {
             flex: 1;
-            min-width: 220px;
-            padding: 12px 14px;
+            padding: 14px 16px;
             border: 1px solid var(--border);
             border-radius: 8px;
             background: var(--panel);
             color: var(--text);
-            font-size: 15px;
+            font-size: 16px;
             outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
 
         .search:focus {
             border-color: var(--primary);
-            box-shadow: 0 0 10px rgba(0, 112, 204, 0.6);
+            box-shadow: 0 0 12px rgba(0, 112, 204, 0.7);
         }
 
         .refresh {
-            border: 0;
+            border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 12px 16px;
-            background: var(--panel-2);
+            padding: 14px 20px;
+            background: #151515;
             color: var(--text);
             cursor: pointer;
             font-weight: 700;
             outline: none;
         }
 
+        /* GRADE DE JOGOS */
         .catalog {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+            gap: 20px;
         }
 
         .game-card {
             display: flex;
-            gap: 18px;
-            background: var(--panel);
+            flex-direction: column;
+            background: var(--panel-card);
             border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 16px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+            border-radius: 10px;
+            padding: 12px;
+            transition: transform 0.15s ease, border-color 0.15s ease;
+        }
+
+        .game-card:hover {
+            border-color: #333333;
         }
 
         .cover-wrap {
-            flex: 0 0 150px;
-            width: 150px;
-        }
-
-        .cover {
-            display: block;
-            width: 150px;
-            height: 150px;
-            object-fit: contain;
-            border-radius: 9px;
-            background: #0a0c0f;
-        }
-
-        .cover-placeholder {
-            width: 150px;
-            height: 150px;
-            border-radius: 9px;
-            background: #20242a;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background: #050505;
+            border-radius: 8px;
+            overflow: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: #777d86;
+        }
+
+        .cover {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .cover-placeholder {
+            color: #555555;
             font-size: 12px;
+            font-weight: bold;
             text-align: center;
             padding: 10px;
         }
 
         .game-content {
+            display: flex;
+            flex-direction: column;
             flex: 1;
-            min-width: 0;
+            margin-top: 12px;
         }
 
         .game-title {
-            margin: 2px 0 7px;
-            font-size: 21px;
-            line-height: 1.25;
+            margin: 0 0 4px;
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1.3;
+            height: 38px;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
             word-break: break-word;
         }
 
         .game-id {
-            margin: 0 0 14px;
+            margin: 0 0 12px;
             color: var(--muted);
-            font-size: 12px;
-            word-break: break-all;
+            font-size: 11px;
+            letter-spacing: 0.5px;
         }
 
         .actions {
+            margin-top: auto;
             display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .action-row {
+            display: flex;
+            gap: 6px;
         }
 
         .action {
+            flex: 1;
             border: 0;
-            border-radius: 7px;
-            padding: 11px 18px;
-            min-width: 100px;
+            border-radius: 6px;
+            padding: 10px 4px;
             background: var(--primary);
             color: white;
-            font-size: 14px;
+            font-size: 12px;
             font-weight: 800;
             cursor: pointer;
             outline: none;
+            text-align: center;
             transition: transform 0.1s ease, box-shadow 0.1s ease;
         }
 
-        .action-update { background: #355f8c; }
-        .action-dlc { background: #7047a3; }
-        .action-patch { background: #99651f; }
+        .action-update { background: #2f5379; }
+        .action-dlc { background: #633994; }
+        .action-patch { background: #875416; }
 
-        /* Foco específico para o cursor do controle do PS4 */
+        /* Foco via controle D-Pad do PS4 */
         .action:focus,
         .action:hover,
         .refresh:focus,
@@ -225,7 +272,7 @@
         .close:hover {
             outline: 3px solid #ffffff !important;
             box-shadow: 0 0 14px rgba(255, 255, 255, 0.9) !important;
-            transform: scale(1.05);
+            transform: scale(1.04);
             z-index: 5;
         }
 
@@ -238,18 +285,21 @@
         }
 
         .package-info {
-            margin-top: 13px;
-            color: var(--muted);
-            font-size: 12px;
+            margin-top: 8px;
+            color: #666666;
+            font-size: 11px;
+            text-align: center;
         }
 
         .empty, .loading, .error {
-            background: var(--panel);
+            grid-column: 1 / -1;
+            background: #0d0d0d;
             border: 1px solid var(--border);
             border-radius: 10px;
-            padding: 28px 18px;
+            padding: 35px 20px;
             text-align: center;
             color: var(--muted);
+            font-size: 15px;
         }
 
         .error { color: #ff817a; }
@@ -257,10 +307,11 @@
         .footer {
             padding: 30px 10px;
             text-align: center;
-            color: #676d76;
+            color: #444444;
             font-size: 11px;
         }
 
+        /* MODAL DE DLC / UPDATES */
         .overlay {
             position: fixed;
             inset: 0;
@@ -268,7 +319,7 @@
             align-items: center;
             justify-content: center;
             padding: 20px;
-            background: rgba(0, 0, 0, 0.85);
+            background: rgba(0, 0, 0, 0.92);
             z-index: 1000;
         }
 
@@ -276,10 +327,10 @@
 
         .modal {
             width: 100%;
-            max-width: 700px;
-            max-height: 90vh;
+            max-width: 650px;
+            max-height: 85vh;
             overflow: auto;
-            background: var(--panel);
+            background: #111111;
             border: 1px solid var(--border);
             border-radius: 12px;
             padding: 18px;
@@ -293,16 +344,16 @@
             margin-bottom: 15px;
         }
 
-        .modal-title { margin: 0; font-size: 21px; }
+        .modal-title { margin: 0; font-size: 18px; }
 
         .close {
             border: 0;
-            background: #292e35;
+            background: #222222;
             color: white;
-            width: 38px;
-            height: 38px;
-            border-radius: 7px;
-            font-size: 20px;
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            font-size: 18px;
             cursor: pointer;
             outline: none;
         }
@@ -310,7 +361,7 @@
         .dlc-list {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
         }
 
         .dlc-item {
@@ -318,34 +369,35 @@
             align-items: center;
             justify-content: space-between;
             gap: 15px;
-            background: var(--panel-2);
+            background: #161616;
             border: 1px solid var(--border);
-            border-radius: 9px;
+            border-radius: 8px;
             padding: 12px;
         }
 
         .dlc-name { flex: 1; min-width: 0; }
-        .dlc-title { margin: 0 0 5px; font-size: 15px; word-break: break-word; }
+        .dlc-title { margin: 0 0 4px; font-size: 14px; word-break: break-word; }
         .dlc-meta { margin: 0; color: var(--muted); font-size: 11px; }
 
         .send-button {
             flex-shrink: 0;
             border: 0;
-            border-radius: 7px;
+            border-radius: 6px;
             background: var(--primary);
             color: white;
-            padding: 10px 16px;
+            padding: 9px 15px;
             font-weight: 800;
+            font-size: 12px;
             cursor: pointer;
             outline: none;
         }
 
         .notice {
             display: none;
-            margin-bottom: 15px;
+            margin-bottom: 18px;
             padding: 14px 16px;
             border-radius: 8px;
-            background: #252a31;
+            background: #161616;
             color: #ffffff;
             font-size: 14px;
             font-weight: bold;
@@ -354,20 +406,8 @@
         }
 
         .notice.visible { display: block; }
-        .notice.error { border-left-color: var(--red); background: #321d20; color: #ff817a; }
-        .notice.success { border-left-color: var(--green); background: #182c1e; color: #4cd964; }
-
-        @media (max-width: 620px) {
-            .game-card { flex-direction: column; }
-            .cover-wrap {
-                width: 100%;
-                flex-basis: auto;
-                display: flex;
-                justify-content: center;
-            }
-            .game-title, .game-id, .actions, .package-info { text-align: center; }
-            .actions { justify-content: center; }
-        }
+        .notice.error { border-left-color: var(--red); background: #261012; color: #ff817a; }
+        .notice.success { border-left-color: var(--green); background: #0e2013; color: #4cd964; }
     </style>
 </head>
 <body>
@@ -384,7 +424,7 @@
 
 <main class="container">
     <div class="toolbar">
-        <input id="search" class="search" type="search" placeholder="Pesquisar jogo..." autocomplete="off">
+        <input id="search" class="search" type="text" placeholder="Pesquisar por nome ou CUSA..." autocomplete="off">
         <button id="refresh" class="refresh" type="button">Atualizar</button>
     </div>
     <div id="notice" class="notice"></div>
@@ -411,6 +451,7 @@
 let allPackages = [];
 let games = [];
 let ps4ClientIp = "";
+let isServerOnline = false;
 
 function formatSize(bytes) {
     const value = Number(bytes);
@@ -421,22 +462,44 @@ function formatSize(bytes) {
     return (value / (1024 * 1024 * 1024)).toFixed(2) + " GB";
 }
 
+/*
+ * MONITORAMENTO DO STATUS ON / OFF
+ * AbortController garante detecção rápida de queda sem timeout longo
+ */
 async function checkStatus() {
     const badge = document.getElementById("server-status");
     const text = document.getElementById("server-status-text");
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
+
     try {
-        const response = await fetch("/api/status", { cache: "no-store" });
+        const response = await fetch("/api/status", {
+            cache: "no-store",
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
         if (!response.ok) throw new Error("HTTP " + response.status);
         const data = await response.json();
+
+        const wasOffline = !isServerOnline;
+        isServerOnline = true;
 
         badge.className = "server-status status-online";
         const ip = data.localAddress || data.address || data.local_address || "";
         ps4ClientIp = data.clientIp || "";
-        text.textContent = "Servidor online — " + (ip ? ip + ":" + data.port : "Porta " + data.port);
+        text.textContent = "Servidor Online — " + (ip ? ip + ":" + data.port : "Porta " + data.port);
+
+        // Se estava offline e agora reconectou, recarrega o catálogo caso esteja vazio
+        if (wasOffline && allPackages.length === 0) {
+            loadPackages();
+        }
     } catch (error) {
+        clearTimeout(timeoutId);
+        isServerOnline = false;
         badge.className = "server-status status-offline";
-        text.textContent = "Servidor indisponível";
+        text.textContent = "Servidor Offline (Desconectado)";
     }
 }
 
@@ -515,20 +578,23 @@ function buildCatalog(packages) {
 }
 
 /*
- * Dispara o instalador chamando a API de DPI do servidor Android
+ * DISPARO DA INSTALAÇÃO (DPI / PAYLOAD)
  */
 async function sendPackage(pkg, button) {
+    if (!isServerOnline) {
+        showNotice("✗ Servidor Offline! Ligue o servidor no celular antes de instalar.", "error");
+        return;
+    }
+
     button.disabled = true;
     const original = button.textContent;
-    button.textContent = "A enviar...";
+    button.textContent = "...";
     showNotice("A enviar payload ao PS4 (Porta 9090)...");
 
     try {
         const response = await fetch("/api/install-dpi", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 pkgId: pkg.id,
                 ip: ps4ClientIp
@@ -538,14 +604,14 @@ async function sendPackage(pkg, button) {
         const result = await response.json();
 
         if (result.success) {
-            button.textContent = "Na fila!";
+            button.textContent = "OK!";
             showNotice("✓ " + (result.message || "Instalação iniciada! Verifique o console."), "success");
         } else {
-            button.textContent = "Falha";
+            button.textContent = "Erro";
             showNotice("✗ " + (result.error || "Erro ao acionar BinLoader."), "error");
         }
     } catch (err) {
-        button.textContent = "Erro";
+        button.textContent = "Falha";
         showNotice("✗ Falha de comunicação com o servidor Android: " + err.message, "error");
     } finally {
         setTimeout(() => {
@@ -606,15 +672,24 @@ function openPackageList(titleText, packages) {
     overlay.classList.add("visible");
 }
 
+/*
+ * Renderiza em grade com filtro funcional por Título e CUSA
+ */
 function renderCatalog() {
     const container = document.getElementById("catalog");
-    const search = document.getElementById("search").value.trim().toLowerCase();
+    const query = document.getElementById("search").value.trim().toLowerCase();
 
-    const filtered = games.filter(g => !search || g.title.toLowerCase().includes(search));
+    const filtered = games.filter(g => {
+        if (!query) return true;
+        const matchesTitle = g.title.toLowerCase().includes(query);
+        const matchesKey = g.key.toLowerCase().includes(query);
+        return matchesTitle || matchesKey;
+    });
+
     container.innerHTML = "";
 
     if (!filtered.length) {
-        container.innerHTML = '<div class="empty">Nenhum jogo encontrado.</div>';
+        container.innerHTML = '<div class="empty">Nenhum jogo encontrado para a busca.</div>';
         return;
     }
 
@@ -622,6 +697,7 @@ function renderCatalog() {
         const card = document.createElement("article");
         card.className = "game-card";
 
+        // Capa
         const coverWrap = document.createElement("div");
         coverWrap.className = "cover-wrap";
 
@@ -630,62 +706,77 @@ function renderCatalog() {
             image.className = "cover";
             image.src = game.cover;
             image.alt = game.title;
+            image.loading = "lazy";
             coverWrap.appendChild(image);
         } else {
             const placeholder = document.createElement("div");
             placeholder.className = "cover-placeholder";
-            placeholder.textContent = "CAPA INDISPONÍVEL";
+            placeholder.textContent = game.key || "SEM CAPA";
             coverWrap.appendChild(placeholder);
         }
 
+        // Conteúdo
         const content = document.createElement("div");
         content.className = "game-content";
 
         const title = document.createElement("h2");
         title.className = "game-title";
         title.textContent = game.title || "Jogo";
+        title.title = game.title;
 
         const id = document.createElement("p");
         id.className = "game-id";
         id.textContent = game.key;
 
+        // Botões de Ação
         const actions = document.createElement("div");
         actions.className = "actions";
 
-        // GAME
+        const mainRow = document.createElement("div");
+        mainRow.className = "action-row";
+
+        // Botão GAME
         if (game.game) {
             const btn = document.createElement("button");
             btn.className = "action";
             btn.type = "button";
             btn.textContent = "GAME";
             btn.onclick = () => sendPackage(game.game, btn);
-            actions.appendChild(btn);
+            mainRow.appendChild(btn);
         }
 
-        // UPDATE
+        // Botão UPDATE
         if (game.updates.length) {
             const btn = document.createElement("button");
             btn.className = "action action-update";
             btn.type = "button";
-            btn.textContent = game.updates.length > 1 ? "UPDATE (" + game.updates.length + ")" : "UPDATE";
+            btn.textContent = game.updates.length > 1 ? "UPD (" + game.updates.length + ")" : "UPDATE";
             btn.onclick = () => {
                 if (game.updates.length === 1) sendPackage(game.updates[0], btn);
                 else openPackageList("UPDATE — " + game.title, game.updates);
             };
-            actions.appendChild(btn);
+            mainRow.appendChild(btn);
         }
 
-        // DLC
+        if (mainRow.children.length > 0) {
+            actions.appendChild(mainRow);
+        }
+
+        // Linha secundária (DLC / PATCH)
+        const secRow = document.createElement("div");
+        secRow.className = "action-row";
+
+        // Botão DLC
         if (game.dlcs.length) {
             const btn = document.createElement("button");
             btn.className = "action action-dlc";
             btn.type = "button";
             btn.textContent = "DLC (" + game.dlcs.length + ")";
             btn.onclick = () => openDlc(game);
-            actions.appendChild(btn);
+            secRow.appendChild(btn);
         }
 
-        // PATCH
+        // Botão PATCH
         if (game.patches.length) {
             const btn = document.createElement("button");
             btn.className = "action action-patch";
@@ -695,12 +786,19 @@ function renderCatalog() {
                 if (game.patches.length === 1) sendPackage(game.patches[0], btn);
                 else openPackageList("PATCH — " + game.title, game.patches);
             };
-            actions.appendChild(btn);
+            secRow.appendChild(btn);
         }
 
+        if (secRow.children.length > 0) {
+            actions.appendChild(secRow);
+        }
+
+        // Info de tamanho
         const info = document.createElement("div");
         info.className = "package-info";
-        if (game.game) info.textContent = "Tamanho base: " + formatSize(game.game.size);
+        if (game.game) {
+            info.textContent = formatSize(game.game.size);
+        }
 
         content.appendChild(title);
         content.appendChild(id);
@@ -740,19 +838,27 @@ function showNotice(message, type = "") {
     }, 7000);
 }
 
-document.getElementById("search").addEventListener("input", renderCatalog);
+// Eventos de busca
+const searchInput = document.getElementById("search");
+searchInput.addEventListener("input", renderCatalog);
+searchInput.addEventListener("keyup", renderCatalog);
+searchInput.addEventListener("change", renderCatalog);
+
 document.getElementById("refresh").addEventListener("click", async () => {
     await checkStatus();
     await loadPackages();
 });
+
 document.getElementById("dlc-close").addEventListener("click", closeDlc);
 document.getElementById("dlc-overlay").addEventListener("click", (e) => {
     if (e.target === e.currentTarget) closeDlc();
 });
 
+// Inicialização e agendamento da checagem contínua (a cada 4 segundos)
 document.addEventListener("DOMContentLoaded", async () => {
     await checkStatus();
     await loadPackages();
+    setInterval(checkStatus, 4000);
 });
 </script>
 </body>
