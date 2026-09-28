@@ -36,6 +36,7 @@ class HttpServer(
         private const val MAX_POST_SIZE = 1024 * 1024
         private const val SOCKET_TIMEOUT_MS = 60_000
         private const val PAYLOAD_DIR = "payloads"
+        private const val MAX_LOG_LINES = 300
 
         private val ALLOWED_PAYLOADS = setOf(
             "rpi_installer.bin",
@@ -53,6 +54,19 @@ class HttpServer(
 
     private val executor = Executors.newCachedThreadPool()
     private val activeConnections = AtomicInteger(0)
+
+    // Log em memória, exibido em http://IP:8080/api/log
+    private val logLines = Collections.synchronizedList(ArrayList<String>())
+
+    private fun dbg(msg: String) {
+        val time = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(java.util.Date())
+        val line = "$time $msg"
+        android.util.Log.d("GTStore", line)
+        synchronized(logLines) {
+            logLines.add(line)
+            while (logLines.size > MAX_LOG_LINES) logLines.removeAt(0)
+        }
+    }
 
     val localAddress: String
         get() = getWifiIpv4Address()?.hostAddress ?: "0.0.0.0"
@@ -88,6 +102,7 @@ class HttpServer(
                 }
                 serverSocket?.reuseAddress = true
                 running = true
+                dbg("servidor iniciado em ${address?.hostAddress ?: "0.0.0.0"}:$port")
 
                 while (running) {
                     try {
@@ -97,7 +112,8 @@ class HttpServer(
                         if (!running) break
                     }
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                dbg("falha ao iniciar servidor: $e")
                 running = false
             } finally {
                 stop()
@@ -167,13 +183,17 @@ class HttpServer(
                     }
                 }
 
+                if (!target.startsWith("/api/log")) {
+                    dbg("$clientIp $method $target range=${headers["range"]} ua=${headers["user-agent"]}")
+                }
+
                 val contentLength = headers["content-length"]?.toIntOrNull() ?: 0
                 if (contentLength < 0 || contentLength > MAX_POST_SIZE) {
                     sendError(output, 413, "Request Entity Too Large")
                     return
                 }
 
-                // CORREÇÃO: o BufferedReader já consumiu parte (ou todo) o corpo do socket.
+                // O BufferedReader já consumiu parte (ou todo) o corpo do socket.
                 // O corpo precisa ser lido do MESMO reader. Como o charset é ISO_8859_1,
                 // 1 char = 1 byte, então reconvertemos para os bytes originais.
                 val body = if (method == "POST" && contentLength > 0) {
@@ -197,7 +217,8 @@ class HttpServer(
                     else -> sendError(output, 405, "Method Not Allowed", mapOf("Allow" to "GET, HEAD, POST, OPTIONS"))
                 }
             } catch (_: SocketException) {
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                dbg("erro em $target: $e")
                 try {
                     val out = client.getOutputStream()
                     // Rotas /api sempre respondem JSON, para o JS da página conseguir ler o erro.
@@ -233,12 +254,14 @@ class HttpServer(
             val pkgId = json.optInt("pkgId", -1)
 
             if (!isValidIp(ps4Ip) || pkgId == -1) {
+                dbg("PASSO 1 falhou: ip='$ps4Ip' pkgId=$pkgId")
                 sendJsonError(output, 400, "[PASSO 1] IP do PS4 ou ID do PKG inválido.")
                 return
             }
 
             val packageInfo = getPackages().firstOrNull { it.id == pkgId }
             if (packageInfo == null) {
+                dbg("PASSO 2 falhou: pkgId=$pkgId não existe")
                 sendJsonError(output, 404, "[PASSO 2] Pacote não encontrado na lista.")
                 return
             }
@@ -246,12 +269,15 @@ class HttpServer(
             // Metadados reais do PKG (TITLE, CONTENT_ID, CATEGORY, ícone).
             val meta = PkgMetaReader.read(context, packageInfo.uri)
             if (meta == null) {
+                dbg("PASSO 2b falhou: param.sfo ilegível em ${packageInfo.fileName}")
                 sendJsonError(output, 422, "[PASSO 2b] Não consegui ler o param.sfo deste PKG (${packageInfo.fileName}).")
                 return
             }
+            dbg("meta: title=${meta.title} id=${meta.contentId} cat=${meta.category} type=${meta.bgftType} icon=${meta.icon?.size ?: 0}B size=${packageInfo.size}")
 
             val payloadTemplate = loadPayload("payload.bin") ?: loadPayload("direct-installer.bin")
             if (payloadTemplate == null) {
+                dbg("PASSO 3 falhou: payload.bin ausente")
                 sendJsonError(output, 500, "[PASSO 3] Ficheiro payload.bin não encontrado na pasta assets/payloads.")
                 return
             }
@@ -259,6 +285,7 @@ class HttpServer(
             val payload = payloadTemplate.copyOf()
             val off = indexOf(payload, byteArrayOf(0xB4.toByte(), 0xB4.toByte(), 0xB4.toByte(), 0xB4.toByte(), 0xB4.toByte(), 0xB4.toByte()))
             if (off < 0) {
+                dbg("PASSO 4 falhou: marcador B4 ausente (payload de ${payload.size} bytes)")
                 sendJsonError(output, 500, "[PASSO 4] Marcador B4 não encontrado. O payload.bin não é o correto do DPI.")
                 return
             }
@@ -266,6 +293,7 @@ class HttpServer(
             // IP do telemóvel como o PS4 o enxerga (o mesmo que ele usou para abrir a página).
             val localIp = requestHost(headers)
             if (localIp == "0.0.0.0" || localIp.isEmpty()) {
+                dbg("PASSO 5 falhou: IP local indisponível")
                 sendJsonError(output, 500, "[PASSO 5] O telemóvel não conseguiu ler o seu próprio IP. (Desligue os dados móveis 4G/5G).")
                 return
             }
@@ -281,29 +309,37 @@ class HttpServer(
                     localAddr.address.copyInto(payload, off)
                     payload[off + 4] = (callbackPort ushr 8).toByte()
                     payload[off + 5] = callbackPort.toByte()
+                    dbg("payload: ip=$localIp callbackPort=$callbackPort manifest=$manifestUrl ps4=$ps4Ip")
 
                     val binResult = sendPayloadToBinLoader(ps4Ip, payload)
                     if (!binResult.success) {
+                        dbg("PASSO 6 falhou: ${binResult.error}")
                         sendJsonError(output, 502, "[PASSO 6] Falha ao enviar para o BinLoader (Porta 9090). O BinLoader está ativo no GoldHEN?\nDetalhe técnico: ${binResult.error}")
                         return
                     }
+                    dbg("payload enviado ao BinLoader; aguardando o PS4 conectar de volta")
 
                     try {
                         tempServer.accept().use { ps4Client ->
+                            dbg("PS4 conectou de volta; enviando dados do pacote")
                             ps4Client.getOutputStream().apply {
                                 write(buildDpiInfo(manifestUrl, packageInfo, meta))
                                 flush()
                             }
                         }
+                        dbg("dados do pacote enviados ao PS4; agora ele deve pedir o manifesto")
                         sendJson(output, 200, JSONObject().put("success", true).put("message", "Instalação DPI iniciada no PS4!"))
                     } catch (e: Exception) {
+                        dbg("PASSO 7 falhou: $e")
                         sendJsonError(output, 504, "[PASSO 7] Timeout: O PS4 recebeu o payload, mas não ligou de volta ao telemóvel (Porta $callbackPort).\nDetalhe técnico: ${e.message}")
                     }
                 }
             } catch (e: Exception) {
+                dbg("PASSO 8 falhou: $e")
                 sendJsonError(output, 500, "[PASSO 8] Falha ao abrir a porta de escuta no telemóvel.\nDetalhe técnico: ${e.message}")
             }
         } catch (e: Exception) {
+            dbg("PASSO 9 falhou: ${e.javaClass.simpleName} ${e.message}")
             sendJsonError(output, 400, "[PASSO 9] Erro geral de execução.\nDetalhe técnico: ${e.javaClass.simpleName} - ${e.message}")
         }
     }
@@ -530,6 +566,10 @@ class HttpServer(
             path == "/" || path == "/ps4" -> sendHomePage(output, headOnly)
             path == "/api/status" -> sendStatusJson(output, headOnly, clientIp)
             path == "/api/packages" -> sendPackagesJson(output, headOnly)
+            path == "/api/log" -> {
+                val text = synchronized(logLines) { logLines.joinToString("\n") }.ifEmpty { "(sem logs ainda)" }
+                sendResponse(output, 200, "OK", "text/plain; charset=utf-8", text.toByteArray(StandardCharsets.UTF_8), headOnly, mapOf("Cache-Control" to "no-cache", "Access-Control-Allow-Origin" to "*"))
+            }
             path.startsWith("/json/") -> {
                 val id = path.removePrefix("/json/").removeSuffix(".json").toIntOrNull()
                 if (id != null) sendManifestJson(id, headers, output, headOnly) else sendError(output, 404, "Not Found")
@@ -558,17 +598,20 @@ class HttpServer(
     private fun sendManifestJson(packageId: Int, headers: Map<String, String>, output: OutputStream, headOnly: Boolean) {
         val packageInfo = getPackages().firstOrNull { it.id == packageId }
         if (packageInfo == null) {
+            dbg("manifesto: pacote $packageId não encontrado")
             sendError(output, 404, "Package Not Found")
             return
         }
         val fileUrl = "http://${requestHost(headers)}:$port/pkg/${packageInfo.id}"
         val json = """{"originalFileSize":${packageInfo.size},"packageDigest":"0000000000000000000000000000000000000000","numberOfSplitFiles":1,"pieces":[{"url":"$fileUrl","fileOffset":0,"fileSize":${packageInfo.size},"hashValue":"0000000000000000000000000000000000000000"}]}"""
+        dbg("manifesto servido: $json")
         sendResponse(output, 200, "OK", "application/json; charset=utf-8", json.toByteArray(StandardCharsets.UTF_8), headOnly, mapOf("Access-Control-Allow-Origin" to "*"))
     }
 
     private fun servePackage(packageId: Int, headers: Map<String, String>, output: OutputStream, headOnly: Boolean) {
         val packageInfo = getPackages().firstOrNull { it.id == packageId }
         if (packageInfo == null) {
+            dbg("pkg: pacote $packageId não encontrado")
             sendError(output, 404, "Package Not Found")
             return
         }
@@ -650,6 +693,7 @@ class HttpServer(
             responseHeaders["Content-Range"] = "bytes $start-$end/$totalSize"
         }
 
+        dbg("pkg $packageId: HTTP $statusCode bytes $start-$end/$totalSize (headOnly=$headOnly)")
         writeHeaders(output, statusCode, statusText, responseHeaders)
 
         if (headOnly || contentLength <= 0L) {
@@ -657,20 +701,26 @@ class HttpServer(
             return
         }
 
+        var sent = 0L
         try {
             context.contentResolver.openFileDescriptor(packageInfo.uri, "r")?.use { pfd ->
                 FileInputStream(pfd.fileDescriptor).use { fis ->
                     fis.channel.position(start)
-                    streamRange(fis, output, contentLength)
+                    sent = streamRange(fis, output, contentLength)
                 }
             }
-        } catch (_: SocketException) {
-        } catch (_: Exception) {}
+            dbg("pkg $packageId: enviados $sent de $contentLength bytes")
+        } catch (e: SocketException) {
+            dbg("pkg $packageId: conexão encerrada pelo PS4 após $sent bytes")
+        } catch (e: Exception) {
+            dbg("pkg $packageId: erro ao ler/enviar: $e")
+        }
 
         try { output.flush() } catch (_: Exception) {}
     }
 
-    private fun streamRange(input: InputStream, output: OutputStream, bytesToSend: Long) {
+    /** Devolve quantos bytes foram enviados; em falha de socket propaga a exceção. */
+    private fun streamRange(input: InputStream, output: OutputStream, bytesToSend: Long): Long {
         val buffer = ByteArray(BUFFER_SIZE)
         var remaining = bytesToSend
 
@@ -681,6 +731,7 @@ class HttpServer(
             output.write(buffer, 0, read)
             remaining -= read
         }
+        return bytesToSend - remaining
     }
 
     private fun getPackages(): List<PackageInfo> {
@@ -813,6 +864,7 @@ class HttpServer(
     }
 
     private fun sendRangeError(output: OutputStream, totalSize: Long) {
+        dbg("pkg: Range inválido/insatisfazível (tamanho $totalSize)")
         sendError(output, 416, "Range Not Satisfiable", mapOf("Content-Range" to "bytes */$totalSize", "Accept-Ranges" to "bytes", "Access-Control-Allow-Origin" to "*"))
     }
 
