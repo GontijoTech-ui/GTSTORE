@@ -9,7 +9,6 @@
             --bg: #000000;
             --panel: #0d0d0d;
             --panel-card: #121212;
-            --panel-card-hover: #181818;
             --border: #222222;
             --primary: #0070cc;
             --primary-hover: #0088f0;
@@ -20,379 +19,157 @@
             --red: #ff453a;
         }
 
-        * {
-            box-sizing: border-box;
-        }
-
+        * { box-sizing: border-box; }
         html, body {
-            margin: 0;
-            padding: 0;
-            min-height: 100%;
-            background-color: var(--bg);
-        }
-
-        body {
-            background-color: #000000;
-            color: var(--text);
+            margin: 0; padding: 0; min-height: 100%;
+            background-color: #000000; color: var(--text);
             font-family: Arial, Helvetica, sans-serif;
         }
-
-        button, input {
-            font-family: inherit;
-        }
+        button, input { font-family: inherit; }
 
         .header {
-            width: 100%;
-            background: #000000;
-            border-bottom: 1px solid var(--border);
-            padding: 24px 16px 20px;
-            text-align: center;
+            width: 100%; background: #000000; border-bottom: 1px solid var(--border);
+            padding: 24px 16px 20px; text-align: center;
         }
 
-        /* LOGO AMPLIADA E CENTRALIZADA */
         .logo {
-            display: block;
-            width: 220px;
-            max-width: 80%;
-            height: auto;
-            max-height: 120px;
-            object-fit: contain;
-            margin: 0 auto 12px;
-            border-radius: 12px;
+            display: block; width: 220px; max-width: 80%; height: auto;
+            max-height: 120px; object-fit: contain; margin: 0 auto 12px; border-radius: 12px;
         }
 
-        /* BADGE DE STATUS ON / OFF */
         .server-status {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            margin-top: 6px;
-            padding: 6px 14px;
-            border-radius: 20px;
-            background: #141414;
-            border: 1px solid #222;
-            color: var(--muted);
-            font-size: 12px;
-            transition: all 0.3s ease;
+            display: inline-flex; align-items: center; gap: 8px; margin-top: 6px;
+            padding: 6px 14px; border-radius: 20px; background: #141414;
+            border: 1px solid #222; color: var(--muted); font-size: 12px;
         }
 
-        .status-dot {
-            width: 9px;
-            height: 9px;
-            border-radius: 50%;
-            background: var(--orange);
-            transition: background-color 0.3s ease;
-        }
+        .status-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--orange); }
+        .status-online .status-dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
+        .status-offline .status-dot { background: var(--red); box-shadow: 0 0 8px var(--red); }
 
-        .status-online {
-            border-color: rgba(53, 199, 89, 0.3);
-            color: #d1d1d1;
-        }
-        .status-online .status-dot {
-            background: var(--green);
-            box-shadow: 0 0 8px var(--green);
-        }
-
-        .status-offline {
-            border-color: rgba(255, 69, 58, 0.4);
-            color: #ff817a;
-        }
-        .status-offline .status-dot {
-            background: var(--red);
-            box-shadow: 0 0 8px var(--red);
-        }
-
-        .container {
-            width: 95%;
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 24px 0 60px;
-        }
-
-        .toolbar {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            margin-bottom: 24px;
-        }
+        .container { width: 95%; max-width: 1400px; margin: 0 auto; padding: 24px 0 60px; }
+        .toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 24px; }
 
         .search {
-            flex: 1;
-            padding: 14px 16px;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            background: var(--panel);
-            color: var(--text);
-            font-size: 16px;
-            outline: none;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            flex: 1; padding: 14px 16px; border: 1px solid var(--border);
+            border-radius: 8px; background: var(--panel); color: var(--text);
+            font-size: 16px; outline: none;
         }
-
-        .search:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 12px rgba(0, 112, 204, 0.7);
-        }
+        .search:focus { border-color: var(--primary); box-shadow: 0 0 12px rgba(0, 112, 204, 0.7); }
 
         .refresh {
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 14px 20px;
-            background: #151515;
-            color: var(--text);
-            cursor: pointer;
-            font-weight: 700;
-            outline: none;
+            border: 1px solid var(--border); border-radius: 8px; padding: 14px 20px;
+            background: #151515; color: var(--text); cursor: pointer; font-weight: 700; outline: none;
         }
 
-        /* GRADE DE JOGOS */
+        /* GRADE DA PÁGINA INICIAL */
         .catalog {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-            gap: 20px;
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 20px;
         }
 
         .game-card {
-            display: flex;
-            flex-direction: column;
-            background: var(--panel-card);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 12px;
-            transition: transform 0.15s ease, border-color 0.15s ease;
-        }
-
-        .game-card:hover {
-            border-color: #333333;
+            display: flex; flex-direction: column; background: var(--panel-card);
+            border: 1px solid var(--border); border-radius: 10px; padding: 12px;
         }
 
         .cover-wrap {
-            width: 100%;
-            aspect-ratio: 1 / 1;
-            background: #050505;
-            border-radius: 8px;
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            width: 100%; aspect-ratio: 1 / 1; background: #050505; border-radius: 8px;
+            overflow: hidden; display: flex; align-items: center; justify-content: center;
         }
+        .cover { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .cover-placeholder { color: #555; font-size: 12px; font-weight: bold; text-align: center; }
 
-        .cover {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
-        }
-
-        .cover-placeholder {
-            color: #555555;
-            font-size: 12px;
-            font-weight: bold;
-            text-align: center;
-            padding: 10px;
-        }
-
-        .game-content {
-            display: flex;
-            flex-direction: column;
-            flex: 1;
-            margin-top: 12px;
-        }
-
+        .game-content { display: flex; flex-direction: column; flex: 1; margin-top: 12px; }
         .game-title {
-            margin: 0 0 4px;
-            font-size: 15px;
-            font-weight: 700;
-            line-height: 1.3;
-            height: 38px;
-            overflow: hidden;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            word-break: break-word;
+            margin: 0 0 4px; font-size: 15px; font-weight: 700; line-height: 1.3;
+            height: 38px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical; word-break: break-word;
+        }
+        .game-id { margin: 0 0 12px; color: var(--muted); font-size: 11px; }
+
+        /* BOTÃO ACESSAR NA PÁGINA INICIAL */
+        .btn-access {
+            width: 100%; border: 0; border-radius: 6px; padding: 12px;
+            background: var(--primary); color: white; font-size: 13px; font-weight: 800;
+            cursor: pointer; outline: none; text-align: center;
         }
 
-        .game-id {
-            margin: 0 0 12px;
-            color: var(--muted);
-            font-size: 11px;
-            letter-spacing: 0.5px;
-        }
-
-        .actions {
-            margin-top: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .action-row {
-            display: flex;
-            gap: 6px;
-        }
-
-        .action {
-            flex: 1;
-            border: 0;
-            border-radius: 6px;
-            padding: 10px 4px;
-            background: var(--primary);
-            color: white;
-            font-size: 12px;
-            font-weight: 800;
-            cursor: pointer;
-            outline: none;
-            text-align: center;
-            transition: transform 0.1s ease, box-shadow 0.1s ease;
-        }
-
-        .action-update { background: #2f5379; }
-        .action-dlc { background: #633994; }
-        .action-patch { background: #875416; }
-
-        /* Foco via controle D-Pad do PS4 */
-        .action:focus,
-        .action:hover,
-        .refresh:focus,
-        .refresh:hover,
-        .send-button:focus,
-        .send-button:hover,
-        .close:focus,
-        .close:hover {
+        /* FOCO COM O CONTROLE DO PS4 */
+        .btn-access:focus, .btn-access:hover,
+        .btn-install:focus, .btn-install:hover,
+        .btn-sec:focus, .btn-sec:hover,
+        .refresh:focus, .refresh:hover {
             outline: 3px solid #ffffff !important;
             box-shadow: 0 0 14px rgba(255, 255, 255, 0.9) !important;
-            transform: scale(1.04);
+            transform: scale(1.03);
             z-index: 5;
         }
 
-        .action:disabled,
-        .send-button:disabled {
-            opacity: 0.5;
-            cursor: default;
-            transform: none !important;
-            box-shadow: none !important;
+        /* PÁGINA DE DETALHES DO JOGO (SEPARADA) */
+        .view-details {
+            display: none; background: #0a0a0a; border: 1px solid var(--border);
+            border-radius: 14px; padding: 24px; margin-top: 10px;
+        }
+        .view-details.active { display: block; }
+
+        .btn-back {
+            background: #1a1a1a; border: 1px solid var(--border); color: #fff;
+            padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer;
+            margin-bottom: 20px; outline: none;
         }
 
-        .package-info {
-            margin-top: 8px;
-            color: #666666;
-            font-size: 11px;
-            text-align: center;
+        .details-layout { display: flex; gap: 24px; flex-wrap: wrap; }
+        .details-cover { width: 220px; height: 220px; border-radius: 12px; object-fit: cover; }
+        .details-info { flex: 1; min-width: 250px; }
+        .details-title { margin: 0 0 8px; font-size: 22px; }
+        .details-id { color: var(--muted); margin: 0 0 18px; font-size: 13px; }
+
+        .details-actions { display: flex; flex-direction: column; gap: 10px; max-width: 400px; margin-top: 15px; }
+        .btn-install {
+            border: 0; border-radius: 8px; padding: 14px; font-size: 14px;
+            font-weight: 800; cursor: pointer; color: white; outline: none; text-align: center;
         }
+        .btn-install-game { background: var(--primary); }
+        .btn-install-upd { background: #2f5379; }
+        .btn-install-dlc { background: #633994; }
 
-        .empty, .loading, .error {
-            grid-column: 1 / -1;
-            background: #0d0d0d;
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 35px 20px;
-            text-align: center;
-            color: var(--muted);
-            font-size: 15px;
-        }
-
-        .error { color: #ff817a; }
-
-        .footer {
-            padding: 30px 10px;
-            text-align: center;
-            color: #333333;
-            font-size: 11px;
-        }
-
-        /* MODAL DE DLC / UPDATES */
+        /* MODAIS (PIN & DLCS) */
         .overlay {
-            position: fixed;
-            inset: 0;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            background: rgba(0, 0, 0, 0.92);
-            z-index: 1000;
+            position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+            padding: 20px; background: rgba(0, 0, 0, 0.92); z-index: 1000;
         }
-
         .overlay.visible { display: flex; }
 
         .modal {
-            width: 100%;
-            max-width: 650px;
-            max-height: 85vh;
-            overflow: auto;
-            background: #111111;
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 18px;
+            width: 100%; max-width: 500px; background: #121212; border: 1px solid var(--border);
+            border-radius: 12px; padding: 24px; text-align: center;
+        }
+        .modal h2 { margin-top: 0; font-size: 20px; }
+        .modal p { color: #aaa; font-size: 14px; line-height: 1.4; }
+
+        .whatsapp-box {
+            background: #182c1e; border: 1px solid #35c759; color: #4cd964;
+            padding: 12px; border-radius: 8px; font-weight: bold; font-size: 15px; margin: 15px 0;
         }
 
-        .modal-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 10px;
-            margin-bottom: 15px;
+        .pin-input {
+            width: 180px; letter-spacing: 6px; text-align: center; font-size: 24px;
+            font-weight: bold; padding: 10px; border-radius: 8px; border: 2px solid var(--primary);
+            background: #000; color: #fff; margin: 15px auto; display: block; outline: none;
         }
 
-        .modal-title { margin: 0; font-size: 18px; }
-
-        .close {
-            border: 0;
-            background: #222222;
-            color: white;
-            width: 36px;
-            height: 36px;
-            border-radius: 6px;
-            font-size: 18px;
-            cursor: pointer;
-            outline: none;
+        .modal-buttons { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
+        .btn-sec {
+            border: 0; border-radius: 6px; padding: 12px 18px; font-weight: bold;
+            cursor: pointer; outline: none; color: white; background: #262626;
         }
-
-        .dlc-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .dlc-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 15px;
-            background: #161616;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 12px;
-        }
-
-        .dlc-name { flex: 1; min-width: 0; }
-        .dlc-title { margin: 0 0 4px; font-size: 14px; word-break: break-word; }
-        .dlc-meta { margin: 0; color: var(--muted); font-size: 11px; }
-
-        .send-button {
-            flex-shrink: 0;
-            border: 0;
-            border-radius: 6px;
-            background: var(--primary);
-            color: white;
-            padding: 9px 15px;
-            font-weight: 800;
-            font-size: 12px;
-            cursor: pointer;
-            outline: none;
-        }
+        .btn-sec-primary { background: var(--primary); }
 
         .notice {
-            display: none;
-            margin-bottom: 18px;
-            padding: 14px 16px;
-            border-radius: 8px;
-            background: #161616;
-            color: #ffffff;
-            font-size: 14px;
-            font-weight: bold;
-            border-left: 4px solid var(--primary);
-            white-space: pre-line;
+            display: none; margin-bottom: 18px; padding: 14px 16px; border-radius: 8px;
+            background: #161616; color: #ffffff; font-size: 14px; font-weight: bold;
+            border-left: 4px solid var(--primary); white-space: pre-line;
         }
-
         .notice.visible { display: block; }
         .notice.error { border-left-color: var(--red); background: #261012; color: #ff817a; }
         .notice.success { border-left-color: var(--green); background: #0e2013; color: #4cd964; }
@@ -409,35 +186,80 @@
 </header>
 
 <main class="container">
-    <div class="toolbar">
-        <input id="search" class="search" type="text" placeholder="Pesquisar por nome ou CUSA..." autocomplete="off">
-        <button id="refresh" class="refresh" type="button">Atualizar</button>
-    </div>
     <div id="notice" class="notice"></div>
-    <section id="catalog" class="catalog">
-        <div class="loading">Carregando catálogo...</div>
-    </section>
+
+    <!-- TELA 1: VITRINE PRINCIPAL -->
+    <div id="view-catalog">
+        <div class="toolbar">
+            <input id="search" class="search" type="text" placeholder="Pesquisar por nome ou CUSA..." autocomplete="off">
+            <button id="refresh" class="refresh" type="button">Atualizar</button>
+        </div>
+        <section id="catalog" class="catalog">
+            <div style="grid-column: 1/-1; text-align: center; color: #777; padding: 30px;">Carregando catálogo...</div>
+        </section>
+    </div>
+
+    <!-- TELA 2: DETALHES DO JOGO (COM BOTÕES DE DOWNLOAD) -->
+    <div id="view-details" class="view-details">
+        <button id="btn-back" class="btn-back" type="button">← VOLTAR AO CATÁLOGO</button>
+        <div class="details-layout">
+            <img id="detail-cover" class="details-cover" src="" alt="Capa">
+            <div class="details-info">
+                <h1 id="detail-title" class="details-title">Título do Jogo</h1>
+                <p id="detail-id" class="details-id">CUSA00000</p>
+                <div class="details-actions" id="detail-actions">
+                    <!-- Botões de instalação inseridos dinamicamente aqui -->
+                </div>
+            </div>
+        </div>
+    </div>
 </main>
 
-<footer class="footer"></footer>
-
-<div id="dlc-overlay" class="overlay">
+<!-- MODAL DE PIN & WHATSAPP -->
+<div id="pin-overlay" class="overlay">
     <div class="modal">
-        <div class="modal-header">
-            <h2 id="dlc-modal-title" class="modal-title">DLC</h2>
-            <button id="dlc-close" class="close" type="button">×</button>
+        <h2>Acesso Protegido</h2>
+        <p>Para desbloquear a página de downloads deste jogo, solicite seu PIN de 6 dígitos via WhatsApp:</p>
+
+        <!-- SEU NÚMERO DO WHATSAPP AQUI -->
+        <div class="whatsapp-box" id="whatsapp-display">
+            WhatsApp: (XX) 9XXXX-XXXX
         </div>
-        <div id="dlc-list" class="dlc-list"></div>
+
+        <button id="btn-req-pin" class="btn-sec btn-sec-primary" type="button" style="width: 100%;">
+            SOLICITAR PIN NO SERVIDOR
+        </button>
+
+        <p style="margin-top: 15px; font-size: 12px; color: #888;">Após receber seu código, digite abaixo:</p>
+        <input id="pin-input" class="pin-input" type="tel" maxlength="6" placeholder="000000" autocomplete="off">
+
+        <div class="modal-buttons">
+            <button id="btn-cancel-pin" class="btn-sec" type="button">VOLTAR</button>
+            <button id="btn-confirm-pin" class="btn-sec btn-sec-primary" type="button">CONFIRMAR PIN</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DE SELEÇÃO DE DLC / UPDATES -->
+<div id="dlc-overlay" class="overlay">
+    <div class="modal" style="max-width: 600px; text-align: left;">
+        <h2 id="dlc-modal-title">Pacotes</h2>
+        <div id="dlc-list" style="display: flex; flex-direction: column; gap: 8px; margin: 15px 0;"></div>
+        <button id="dlc-close" class="btn-sec" type="button" style="width: 100%;">FECHAR</button>
     </div>
 </div>
 
 <script>
 "use strict";
 
+// CONFIGURE SEU NÚMERO DE WHATSAPP AQUI:
+const WHATSAPP_CONTATO = "(31) 99999-9999";
+
 let allPackages = [];
 let games = [];
 let ps4ClientIp = "";
 let isServerOnline = false;
+let selectedGame = null;
 
 function formatSize(bytes) {
     const value = Number(bytes);
@@ -451,45 +273,33 @@ function formatSize(bytes) {
 async function checkStatus() {
     const badge = document.getElementById("server-status");
     const text = document.getElementById("server-status-text");
-
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 2500);
 
     try {
-        const response = await fetch("/api/status", {
-            cache: "no-store",
-            signal: controller.signal
-        });
+        const response = await fetch("/api/status", { cache: "no-store", signal: controller.signal });
         clearTimeout(timeoutId);
-
-        if (!response.ok) throw new Error("HTTP " + response.status);
+        if (!response.ok) throw new Error();
         const data = await response.json();
 
-        const wasOffline = !isServerOnline;
         isServerOnline = true;
-
         badge.className = "server-status status-online";
-        const ip = data.localAddress || data.address || data.local_address || "";
+        const ip = data.localAddress || "";
         ps4ClientIp = data.clientIp || "";
         text.textContent = "Servidor Online — " + (ip ? ip + ":" + data.port : "Porta " + data.port);
-
-        if (wasOffline && allPackages.length === 0) {
-            loadPackages();
-        }
-    } catch (error) {
+    } catch (_) {
         clearTimeout(timeoutId);
         isServerOnline = false;
         badge.className = "server-status status-offline";
-        text.textContent = "Servidor Offline (Desconectado)";
+        text.textContent = "Servidor Offline";
     }
 }
 
 function normalizeType(pkg) {
-    const type = String(pkg.catalogType || pkg.type || "").toUpperCase();
+    const type = String(pkg.catalogType || "").toUpperCase();
     if (type === "GAME") return "GAME";
     if (type === "UPDATE") return "UPDATE";
     if (type === "DLC") return "DLC";
-    if (type === "PATCH") return "PATCH";
     return "OTHER";
 }
 
@@ -501,39 +311,20 @@ function groupKey(pkg) {
         const prefix = contentId.split("_00-")[0];
         if (prefix) return prefix;
     }
-    return (pkg.title || pkg.name || ("PKG_" + pkg.id)).trim().toUpperCase();
-}
-
-function packageIcon(pkg) {
-    if (pkg.iconUrl) return pkg.iconUrl;
-    if (pkg.icon) {
-        const icon = String(pkg.icon);
-        return icon.startsWith("data:") ? icon : "data:image/png;base64," + icon;
-    }
-    return null;
+    return (pkg.title || ("PKG_" + pkg.id)).trim().toUpperCase();
 }
 
 function buildCatalog(packages) {
     const groups = new Map();
-
     for (const pkg of packages) {
         const type = normalizeType(pkg);
         const key = groupKey(pkg);
 
         if (!groups.has(key)) {
-            groups.set(key, {
-                key: key,
-                title: "",
-                cover: null,
-                game: null,
-                updates: [],
-                dlcs: [],
-                patches: []
-            });
+            groups.set(key, { key, title: "", cover: null, game: null, updates: [], dlcs: [] });
         }
-
         const game = groups.get(key);
-        const title = String(pkg.title || pkg.name || "").trim();
+        const title = String(pkg.title || "").trim();
 
         if (type === "GAME") {
             game.title = title;
@@ -542,136 +333,29 @@ function buildCatalog(packages) {
             game.title = title;
         }
 
-        const icon = packageIcon(pkg);
-        if (type === "GAME" && icon) {
-            game.cover = icon;
-        } else if (!game.cover && icon) {
-            game.cover = icon;
+        if (pkg.iconUrl && (type === "GAME" || !game.cover)) {
+            game.cover = pkg.iconUrl;
         }
 
-        if (type === "UPDATE") {
-            game.updates.push(pkg);
-        } else if (type === "DLC") {
-            game.dlcs.push(pkg);
-        } else if (type === "PATCH") {
-            game.patches.push(pkg);
-        } else if (type !== "GAME") {
-            if (!game.game) game.game = pkg;
-        }
+        if (type === "UPDATE") game.updates.push(pkg);
+        else if (type === "DLC") game.dlcs.push(pkg);
+        else if (type !== "GAME" && !game.game) game.game = pkg;
     }
-
     const result = Array.from(groups.values());
     result.sort((a, b) => a.title.localeCompare(b.title, "pt-BR", { sensitivity: "base" }));
     return result;
 }
 
-async function sendPackage(pkg, button) {
-    if (!isServerOnline) {
-        showNotice("✗ Servidor Offline! Ligue o servidor no celular antes de instalar.", "error");
-        return;
-    }
-
-    button.disabled = true;
-    const original = button.textContent;
-    button.textContent = "...";
-    showNotice("A enviar payload ao PS4 (Porta 9090)...");
-
-    try {
-        const response = await fetch("/api/install-dpi", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                pkgId: pkg.id,
-                ip: ps4ClientIp
-            })
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-            button.textContent = "OK!";
-            showNotice("✓ " + (result.message || "Instalação iniciada! Verifique o console."), "success");
-        } else {
-            button.textContent = "Erro";
-            showNotice("✗ " + (result.error || "Erro ao acionar BinLoader."), "error");
-        }
-    } catch (err) {
-        button.textContent = "Falha";
-        showNotice("✗ Falha de comunicação com o servidor Android: " + err.message, "error");
-    } finally {
-        setTimeout(() => {
-            button.disabled = false;
-            button.textContent = original;
-        }, 5000);
-    }
-}
-
-function openDlc(game) {
-    openPackageList("DLC — " + game.title, game.dlcs);
-}
-
-function closeDlc() {
-    document.getElementById("dlc-overlay").classList.remove("visible");
-}
-
-function openPackageList(titleText, packages) {
-    const overlay = document.getElementById("dlc-overlay");
-    const title = document.getElementById("dlc-modal-title");
-    const list = document.getElementById("dlc-list");
-
-    title.textContent = titleText;
-    list.innerHTML = "";
-
-    if (!packages.length) {
-        list.innerHTML = '<div class="empty">Nenhum pacote disponível.</div>';
-    } else {
-        for (const pkg of packages) {
-            const item = document.createElement("div");
-            item.className = "dlc-item";
-
-            const info = document.createElement("div");
-            info.className = "dlc-name";
-
-            const name = document.createElement("p");
-            name.className = "dlc-title";
-            name.textContent = pkg.title || pkg.name || "PKG";
-
-            const meta = document.createElement("p");
-            meta.className = "dlc-meta";
-            meta.textContent = String(pkg.contentId || "") + " • " + formatSize(pkg.size);
-
-            info.appendChild(name);
-            info.appendChild(meta);
-
-            const button = document.createElement("button");
-            button.className = "send-button";
-            button.type = "button";
-            button.textContent = "INSTALAR";
-            button.onclick = () => sendPackage(pkg, button);
-
-            item.appendChild(info);
-            item.appendChild(button);
-            list.appendChild(item);
-        }
-    }
-    overlay.classList.add("visible");
-}
-
+// RENDERIZA A PÁGINA INICIAL (APENAS BOTÃO ACESSAR)
 function renderCatalog() {
     const container = document.getElementById("catalog");
     const query = document.getElementById("search").value.trim().toLowerCase();
 
-    const filtered = games.filter(g => {
-        if (!query) return true;
-        const matchesTitle = g.title.toLowerCase().includes(query);
-        const matchesKey = g.key.toLowerCase().includes(query);
-        return matchesTitle || matchesKey;
-    });
-
+    const filtered = games.filter(g => !query || g.title.toLowerCase().includes(query) || g.key.toLowerCase().includes(query));
     container.innerHTML = "";
 
     if (!filtered.length) {
-        container.innerHTML = '<div class="empty">Nenhum jogo encontrado para a busca.</div>';
+        container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #777; padding: 30px;">Nenhum jogo encontrado.</div>';
         return;
     }
 
@@ -681,102 +365,34 @@ function renderCatalog() {
 
         const coverWrap = document.createElement("div");
         coverWrap.className = "cover-wrap";
-
         if (game.cover) {
-            const image = document.createElement("img");
-            image.className = "cover";
-            image.src = game.cover;
-            image.alt = game.title;
-            image.loading = "lazy";
-            coverWrap.appendChild(image);
+            const img = document.createElement("img");
+            img.className = "cover"; img.src = game.cover; img.loading = "lazy";
+            coverWrap.appendChild(img);
         } else {
-            const placeholder = document.createElement("div");
-            placeholder.className = "cover-placeholder";
-            placeholder.textContent = game.key || "SEM CAPA";
-            coverWrap.appendChild(placeholder);
+            const pl = document.createElement("div");
+            pl.className = "cover-placeholder"; pl.textContent = game.key;
+            coverWrap.appendChild(pl);
         }
 
         const content = document.createElement("div");
         content.className = "game-content";
 
         const title = document.createElement("h2");
-        title.className = "game-title";
-        title.textContent = game.title || "Jogo";
-        title.title = game.title;
+        title.className = "game-title"; title.textContent = game.title || "Jogo";
 
         const id = document.createElement("p");
-        id.className = "game-id";
-        id.textContent = game.key;
+        id.className = "game-id"; id.textContent = game.key;
 
-        const actions = document.createElement("div");
-        actions.className = "actions";
-
-        const mainRow = document.createElement("div");
-        mainRow.className = "action-row";
-
-        if (game.game) {
-            const btn = document.createElement("button");
-            btn.className = "action";
-            btn.type = "button";
-            btn.textContent = "GAME";
-            btn.onclick = () => sendPackage(game.game, btn);
-            mainRow.appendChild(btn);
-        }
-
-        if (game.updates.length) {
-            const btn = document.createElement("button");
-            btn.className = "action action-update";
-            btn.type = "button";
-            btn.textContent = game.updates.length > 1 ? "UPD (" + game.updates.length + ")" : "UPDATE";
-            btn.onclick = () => {
-                if (game.updates.length === 1) sendPackage(game.updates[0], btn);
-                else openPackageList("UPDATE — " + game.title, game.updates);
-            };
-            mainRow.appendChild(btn);
-        }
-
-        if (mainRow.children.length > 0) {
-            actions.appendChild(mainRow);
-        }
-
-        const secRow = document.createElement("div");
-        secRow.className = "action-row";
-
-        if (game.dlcs.length) {
-            const btn = document.createElement("button");
-            btn.className = "action action-dlc";
-            btn.type = "button";
-            btn.textContent = "DLC (" + game.dlcs.length + ")";
-            btn.onclick = () => openDlc(game);
-            secRow.appendChild(btn);
-        }
-
-        if (game.patches.length) {
-            const btn = document.createElement("button");
-            btn.className = "action action-patch";
-            btn.type = "button";
-            btn.textContent = game.patches.length > 1 ? "PATCH (" + game.patches.length + ")" : "PATCH";
-            btn.onclick = () => {
-                if (game.patches.length === 1) sendPackage(game.patches[0], btn);
-                else openPackageList("PATCH — " + game.title, game.patches);
-            };
-            secRow.appendChild(btn);
-        }
-
-        if (secRow.children.length > 0) {
-            actions.appendChild(secRow);
-        }
-
-        const info = document.createElement("div");
-        info.className = "package-info";
-        if (game.game) {
-            info.textContent = formatSize(game.game.size);
-        }
+        const btn = document.createElement("button");
+        btn.className = "btn-access";
+        btn.type = "button";
+        btn.textContent = "ACESSAR";
+        btn.onclick = () => openPinModal(game);
 
         content.appendChild(title);
         content.appendChild(id);
-        content.appendChild(actions);
-        content.appendChild(info);
+        content.appendChild(btn);
 
         card.appendChild(coverWrap);
         card.appendChild(content);
@@ -784,47 +400,194 @@ function renderCatalog() {
     }
 }
 
-async function loadPackages() {
-    const container = document.getElementById("catalog");
-    container.innerHTML = '<div class="loading">Carregando catálogo...</div>';
+// FLUXO DO PIN
+function openPinModal(game) {
+    selectedGame = game;
+    document.getElementById("pin-input").value = "";
+    document.getElementById("whatsapp-display").textContent = "WhatsApp: " + WHATSAPP_CONTATO;
+    document.getElementById("pin-overlay").classList.add("visible");
+    document.getElementById("pin-input").focus();
+}
+
+function closePinModal() {
+    document.getElementById("pin-overlay").classList.remove("visible");
+}
+
+async function requestPinOnServer() {
+    if (!selectedGame) return;
+    const btn = document.getElementById("btn-req-pin");
+    btn.disabled = true;
+    btn.textContent = "SOLICITANDO...";
 
     try {
-        const response = await fetch("/api/packages", { cache: "no-store" });
-        if (!response.ok) throw new Error("HTTP " + response.status);
-        const data = await response.json();
-
-        allPackages = Array.isArray(data) ? data : (Array.isArray(data.packages) ? data.packages : []);
-        games = buildCatalog(allPackages);
-        renderCatalog();
-    } catch (error) {
-        console.error("Erro ao carregar catálogo:", error);
-        container.innerHTML = '<div class="error">Não foi possível carregar o catálogo.</div>';
+        const res = await fetch("/api/request-pin", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: selectedGame.title, gameKey: selectedGame.key })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showNotice("✓ Solicitação registrada no servidor! Entre em contato no WhatsApp para obter seu PIN.", "success");
+            btn.textContent = "SOLICITAÇÃO ENVIADA!";
+        }
+    } catch (_) {
+        showNotice("Falha ao registrar solicitação no servidor.", "error");
+        btn.disabled = false;
+        btn.textContent = "SOLICITAR PIN NO SERVIDOR";
     }
 }
 
-function showNotice(message, type = "") {
-    const notice = document.getElementById("notice");
-    notice.textContent = message;
-    notice.className = "notice visible" + (type ? " " + type : "");
-    setTimeout(() => {
-        notice.classList.remove("visible");
-    }, 7000);
+async function verifyPin() {
+    const pin = document.getElementById("pin-input").value.trim();
+    if (pin.length !== 6) {
+        showNotice("Digite um PIN de 6 dígitos.", "error");
+        return;
+    }
+
+    try {
+        const res = await fetch("/api/verify-pin", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pin: pin, gameKey: selectedGame.key })
+        });
+        const data = await res.json();
+        if (data.valid) {
+            closePinModal();
+            showGameDetails(selectedGame);
+        } else {
+            showNotice(data.message || "PIN inválido.", "error");
+        }
+    } catch (_) {
+        showNotice("Erro ao validar PIN com o servidor.", "error");
+    }
 }
 
-const searchInput = document.getElementById("search");
-searchInput.addEventListener("input", renderCatalog);
-searchInput.addEventListener("keyup", renderCatalog);
-searchInput.addEventListener("change", renderCatalog);
+// EXIBE A PÁGINA SEPARADA DE DETALHES COM OS BOTÕES DE INSTALAÇÃO
+function showGameDetails(game) {
+    document.getElementById("view-catalog").style.display = "none";
+    const detailsView = document.getElementById("view-details");
+    detailsView.classList.add("active");
 
-document.getElementById("refresh").addEventListener("click", async () => {
-    await checkStatus();
-    await loadPackages();
-});
+    document.getElementById("detail-title").textContent = game.title;
+    document.getElementById("detail-id").textContent = game.key;
+    document.getElementById("detail-cover").src = game.cover || "";
 
-document.getElementById("dlc-close").addEventListener("click", closeDlc);
-document.getElementById("dlc-overlay").addEventListener("click", (e) => {
-    if (e.target === e.currentTarget) closeDlc();
-});
+    const actions = document.getElementById("detail-actions");
+    actions.innerHTML = "";
+
+    if (game.game) {
+        const btn = document.createElement("button");
+        btn.className = "btn-install btn-install-game";
+        btn.textContent = "INSTALAR JOGO BASE (" + formatSize(game.game.size) + ")";
+        btn.onclick = () => triggerInstall(game.game, btn);
+        actions.appendChild(btn);
+    }
+
+    if (game.updates.length) {
+        const btn = document.createElement("button");
+        btn.className = "btn-install btn-install-upd";
+        btn.textContent = game.updates.length > 1 ? "ATUALIZAÇÕES (" + game.updates.length + ")" : "INSTALAR UPDATE (" + formatSize(game.updates[0].size) + ")";
+        btn.onclick = () => {
+            if (game.updates.length === 1) triggerInstall(game.updates[0], btn);
+            else openPackageModal("Atualizações — " + game.title, game.updates);
+        };
+        actions.appendChild(btn);
+    }
+
+    if (game.dlcs.length) {
+        const btn = document.createElement("button");
+        btn.className = "btn-install btn-install-dlc";
+        btn.textContent = "DLCs DISPONÍVEIS (" + game.dlcs.length + ")";
+        btn.onclick = () => openPackageModal("DLCs — " + game.title, game.dlcs);
+        actions.appendChild(btn);
+    }
+}
+
+function backToCatalog() {
+    document.getElementById("view-details").classList.remove("active");
+    document.getElementById("view-catalog").style.display = "block";
+    selectedGame = null;
+}
+
+// DISPARO DO INSTALADOR DPI
+async function triggerInstall(pkg, button) {
+    if (!isServerOnline) {
+        showNotice("Servidor Offline! Verifique a conexão do aplicativo.", "error");
+        return;
+    }
+    button.disabled = true;
+    const original = button.textContent;
+    button.textContent = "ENVIANDO AO PS4...";
+    showNotice("Enviando payload para a porta 9090 do console...");
+
+    try {
+        const res = await fetch("/api/install-dpi", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pkgId: pkg.id, ip: ps4ClientIp })
+        });
+        const data = await res.json();
+        if (data.success) {
+            button.textContent = "DOWNLOAD INICIADO!";
+            showNotice("✓ Instalação iniciada! Verifique a tela de notificações do PS4.", "success");
+        } else {
+            button.textContent = "FALHA";
+            showNotice("✗ " + (data.error || "Erro ao iniciar instalação."), "error");
+        }
+    } catch (_) {
+        button.textContent = "ERRO";
+        showNotice("Falha ao comunicar com o servidor.", "error");
+    } finally {
+        setTimeout(() => {
+            button.disabled = false;
+            button.textContent = original;
+        }, 5000);
+    }
+}
+
+function openPackageModal(title, list) {
+    document.getElementById("dlc-modal-title").textContent = title;
+    const container = document.getElementById("dlc-list");
+    container.innerHTML = "";
+
+    for (const item of list) {
+        const row = document.createElement("div");
+        row.style = "display:flex; justify-content:space-between; align-items:center; background:#1b1b1b; padding:10px; border-radius:6px;";
+        row.innerHTML = `<div><div style="font-weight:bold; font-size:13px;">${item.title || "PKG"}</div><div style="font-size:11px; color:#888;">${formatSize(item.size)}</div></div>`;
+        const btn = document.createElement("button");
+        btn.className = "btn-sec btn-sec-primary";
+        btn.textContent = "INSTALAR";
+        btn.onclick = () => triggerInstall(item, btn);
+        row.appendChild(btn);
+        container.appendChild(row);
+    }
+    document.getElementById("dlc-overlay").classList.add("visible");
+}
+
+function showNotice(msg, type = "") {
+    const el = document.getElementById("notice");
+    el.textContent = msg;
+    el.className = "notice visible " + type;
+    setTimeout(() => el.classList.remove("visible"), 6000);
+}
+
+async function loadPackages() {
+    try {
+        const res = await fetch("/api/packages", { cache: "no-store" });
+        const data = await res.json();
+        allPackages = data.packages || [];
+        games = buildCatalog(allPackages);
+        renderCatalog();
+    } catch (_) {}
+}
+
+document.getElementById("search").addEventListener("input", renderCatalog);
+document.getElementById("refresh").addEventListener("click", () => { checkStatus(); loadPackages(); });
+document.getElementById("btn-back").addEventListener("click", backToCatalog);
+document.getElementById("btn-cancel-pin").addEventListener("click", closePinModal);
+document.getElementById("btn-confirm-pin").addEventListener("click", verifyPin);
+document.getElementById("btn-req-pin").addEventListener("click", requestPinOnServer);
+document.getElementById("dlc-close").addEventListener("click", () => document.getElementById("dlc-overlay").classList.remove("visible"));
 
 document.addEventListener("DOMContentLoaded", async () => {
     await checkStatus();
