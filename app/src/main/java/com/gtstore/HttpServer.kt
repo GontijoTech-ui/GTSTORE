@@ -193,9 +193,6 @@ class HttpServer(
                     return
                 }
 
-                // O BufferedReader já consumiu parte (ou todo) o corpo do socket.
-                // O corpo precisa ser lido do MESMO reader. Como o charset é ISO_8859_1,
-                // 1 char = 1 byte, então reconvertemos para os bytes originais.
                 val body = if (method == "POST" && contentLength > 0) {
                     val chars = CharArray(contentLength)
                     var off = 0
@@ -221,7 +218,6 @@ class HttpServer(
                 dbg("erro em $target: $e")
                 try {
                     val out = client.getOutputStream()
-                    // Rotas /api sempre respondem JSON, para o JS da página conseguir ler o erro.
                     if (target.startsWith("/api/")) {
                         sendJsonError(out, 500, "Erro interno do servidor (timeout ou falha ao ler a requisição).")
                     } else {
@@ -246,7 +242,6 @@ class HttpServer(
         }
     }
 
-    // --- Lógica do Direct Package Installer com RASTREIO DE ERROS ---
     private fun handleDirectInstallDpi(body: ByteArray, headers: Map<String, String>, output: OutputStream) {
         try {
             val json = JSONObject(String(body, StandardCharsets.UTF_8))
@@ -266,7 +261,6 @@ class HttpServer(
                 return
             }
 
-            // Metadados reais do PKG (TITLE, CONTENT_ID, CATEGORY, ícone).
             val meta = PkgMetaReader.read(context, packageInfo.uri)
             if (meta == null) {
                 dbg("PASSO 2b falhou: param.sfo ilegível em ${packageInfo.fileName}")
@@ -290,7 +284,6 @@ class HttpServer(
                 return
             }
 
-            // IP do telemóvel como o PS4 o enxerga (o mesmo que ele usou para abrir a página).
             val localIp = requestHost(headers)
             if (localIp == "0.0.0.0" || localIp.isEmpty()) {
                 dbg("PASSO 5 falhou: IP local indisponível")
@@ -303,7 +296,7 @@ class HttpServer(
 
             try {
                 ServerSocket(0, 5, localAddr).use { tempServer ->
-                    tempServer.soTimeout = 15_000 // Aguarda 15 segundos pelo PS4
+                    tempServer.soTimeout = 15_000
                     val callbackPort = tempServer.localPort
 
                     localAddr.address.copyInto(payload, off)
@@ -344,7 +337,6 @@ class HttpServer(
         }
     }
 
-    /** Tudo em little-endian: 1u, URL, nome, ContentID, tipo, tamanho (int64), ícone. */
     private fun buildDpiInfo(url: String, info: PackageInfo, meta: PkgMetaReader.Meta): ByteArray {
         val out = ByteArrayOutputStream()
         fun i32(v: Int) = out.write(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(v).array())
@@ -354,7 +346,7 @@ class HttpServer(
         str(url)
         str(meta.title)
         str(meta.contentId)
-        str(meta.bgftType) // PS4GD = jogo, PS4GP = update, PS4AC = DLC
+        str(meta.bgftType)
         out.write(ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN).putLong(info.size).array())
         val icon = meta.icon
         if (icon == null || icon.isEmpty()) i32(0) else { i32(icon.size); out.write(icon) }
@@ -372,7 +364,6 @@ class HttpServer(
         return -1
     }
 
-    /** IPv4 usado pelo cliente para chegar até aqui (cabeçalho Host); cai para a detecção por interface. */
     private fun requestHost(headers: Map<String, String>): String {
         val host = headers["host"]?.substringBefore(':')?.trim()
         return if (!host.isNullOrEmpty() && isValidIp(host)) host else localAddress
@@ -572,7 +563,8 @@ class HttpServer(
             }
             path.startsWith("/json/") -> {
                 val id = path.removePrefix("/json/").removeSuffix(".json").toIntOrNull()
-                if (id != null) sendManifestJson(id, headers, output, headOnly) else sendError(output, 404, "Not Found")
+                // Chamada corrigida passando os 3 parâmetros corretos da assinatura
+                if (id != null) sendManifestJson(id, output, headOnly) else sendError(output, 404, "Not Found")
             }
             path == "/download" || path == "/pkg" -> {
                 val id = uri.getQueryParameter("id")?.toIntOrNull()
@@ -595,18 +587,18 @@ class HttpServer(
         }
     }
 
-        private fun sendManifestJson(packageId: Int, output: OutputStream, headOnly: Boolean) {
+    // Função unificada com o ContentId obtido dos metadados corretos do pacote
+    private fun sendManifestJson(packageId: Int, output: OutputStream, headOnly: Boolean) {
         val packageInfo = getPackages().firstOrNull { it.id == packageId }
         if (packageInfo == null) {
             sendError(output, 404, "Package Not Found")
             return
         }
-        
+
+        val meta = PkgMetaReader.read(context, packageInfo.uri)
+        val contentId = meta?.contentId ?: "UP0001-SPSX14001_00-0000000000000000"
         val fileUrl = "http://$localAddress:$port/pkg/${packageInfo.id}"
-        
-        // ContentID exato obtido dos metadados do teu pacote
-        val contentId = "UP0001-SPSX14001_00-0000000000000000"
-        
+
         val json = """{
             "originalFileSize": ${packageInfo.size},
             "packageDigest": "0000000000000000000000000000000000000000",
@@ -621,10 +613,9 @@ class HttpServer(
                 }
             ]
         }"""
-        
+
         sendResponse(output, 200, "OK", "application/json; charset=utf-8", json.toByteArray(StandardCharsets.UTF_8), headOnly, mapOf("Access-Control-Allow-Origin" to "*"))
     }
-
 
     private fun servePackage(packageId: Int, headers: Map<String, String>, output: OutputStream, headOnly: Boolean) {
         val packageInfo = getPackages().firstOrNull { it.id == packageId }
@@ -737,7 +728,6 @@ class HttpServer(
         try { output.flush() } catch (_: Exception) {}
     }
 
-    /** Devolve quantos bytes foram enviados; em falha de socket propaga a exceção. */
     private fun streamRange(input: InputStream, output: OutputStream, bytesToSend: Long): Long {
         val buffer = ByteArray(BUFFER_SIZE)
         var remaining = bytesToSend
