@@ -142,7 +142,6 @@
         .modal h2 { margin-top: 0; font-size: 20px; }
         .modal p { color: #aaa; font-size: 13px; line-height: 1.4; margin: 8px 0; }
 
-        /* QR CODE */
         .qr-image {
             width: 150px; height: 150px; object-fit: contain;
             margin: 10px auto; display: block; border-radius: 8px;
@@ -196,7 +195,6 @@
 <main class="container">
     <div id="notice" class="notice"></div>
 
-    <!-- TELA 1: VITRINE PRINCIPAL -->
     <div id="view-catalog">
         <div class="toolbar">
             <input id="search" class="search" type="text" placeholder="Pesquisar por nome ou CUSA..." autocomplete="off">
@@ -207,7 +205,6 @@
         </section>
     </div>
 
-    <!-- TELA 2: DETALHES DO JOGO -->
     <div id="view-details" class="view-details">
         <button id="btn-back" class="btn-back" type="button">← VOLTAR AO CATÁLOGO</button>
         <div class="details-layout">
@@ -221,11 +218,10 @@
     </div>
 </main>
 
-<!-- MODAL DE PIN & WHATSAPP COM QR CODE -->
 <div id="pin-overlay" class="overlay">
     <div class="modal">
         <h2>Acesso Protegido</h2>
-        <p>Aponte a câmera do seu celular para o QR Code abaixo para solicitar seu PIN de acesso:</p>
+        <p>Aponte a câmara do telemóvel para o QR Code abaixo para solicitar o seu PIN de acesso:</p>
 
         <a href="https://w.app/rdilgq" target="_blank">
             <img class="qr-image" src="/qr.png" alt="QR Code WhatsApp" onerror="this.style.display='none';">
@@ -248,7 +244,6 @@
     </div>
 </div>
 
-<!-- MODAL DE DLC / UPDATES -->
 <div id="dlc-overlay" class="overlay">
     <div class="modal" style="max-width: 600px; text-align: left;">
         <h2 id="dlc-modal-title">Pacotes</h2>
@@ -488,13 +483,13 @@ function backToCatalog() {
 
 async function triggerInstall(pkg, button) {
     if (!isServerOnline) {
-        showNotice("Servidor Offline! Verifique o app no celular.", "error");
+        showNotice("Servidor Offline! Verifique o app no telemóvel.", "error");
         return;
     }
     button.disabled = true;
     const original = button.textContent;
-    button.textContent = "ENVIANDO AO PS4...";
-    showNotice("Enviando payload para a porta 9090 do console...");
+    button.textContent = "A ENVIAR AO PS4...";
+    showNotice("A enviar payload para a porta 9090 da consola...");
 
     try {
         const res = await fetch("/api/install-dpi", {
@@ -505,7 +500,7 @@ async function triggerInstall(pkg, button) {
         const data = await res.json();
         if (data.success) {
             button.textContent = "DOWNLOAD INICIADO!";
-            showNotice("✓ Instalação iniciada! Verifique as notificações do PS4.", "success");
+            showNotice("✓ Instalação iniciada! Verifique as notificações da PS4.", "success");
         } else {
             button.textContent = "FALHA";
             showNotice("✗ " + (data.error || "Erro ao iniciar instalação."), "error");
