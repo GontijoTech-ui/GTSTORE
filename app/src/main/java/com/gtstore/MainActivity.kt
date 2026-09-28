@@ -43,7 +43,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
 import kotlinx.coroutines.delay
@@ -379,19 +378,19 @@ fun Dashboard(
     }
 }
 
+// 3 & 4: PAINEL ADMIN COM BOTÃO DE ENCAMINHAR PARA O WHATSAPP
 @Composable
 fun AdminScreen(
     httpServer: HttpServer,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
-    var currentPin by remember { mutableStateOf("------") }
-    var activePins by remember { mutableStateOf<List<PinEntry>>(emptyList()) }
+    var pinRequests by remember { mutableStateOf<List<PinRequest>>(emptyList()) }
 
     LaunchedEffect(Unit) {
         while (true) {
-            activePins = httpServer.getActivePinsList()
-            delay(2000)
+            pinRequests = httpServer.getPinRequests()
+            delay(1500)
         }
     }
 
@@ -403,115 +402,96 @@ fun AdminScreen(
     ) {
         item {
             Text(
-                text = "PAINEL ADMIN",
+                text = "SOLICITAÇÕES DE PIN",
                 style = MaterialTheme.typography.headlineMedium
             )
         }
 
         item {
-            Card(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = "GERADOR DE PIN (PS4)",
-                        style = MaterialTheme.typography.titleLarge
-                    )
-
-                    Text(
-                        text = "Gere um PIN de 6 dígitos válido por 10 minutos para liberar o acesso ao catálogo no PS4.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-
-                    Text(
-                        text = currentPin,
-                        style = MaterialTheme.typography.displayMedium,
-                        color = Color(0xFF35C759),
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Center
-                    )
-
-                    Button(
-                        onClick = {
-                            val pin = httpServer.generateAdminPin()
-                            currentPin = pin
-                            activePins = httpServer.getActivePinsList()
-
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            clipboard.setPrimaryClip(ClipData.newPlainText("PIN PS4", pin))
-                            Toast.makeText(context, "PIN $pin copiado!", Toast.LENGTH_SHORT).show()
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("GERAR NOVO PIN (10 MIN)")
-                    }
-
-                    Button(
-                        onClick = {
-                            if (currentPin != "------" && currentPin.isNotBlank()) {
-                                val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(
-                                        Intent.EXTRA_TEXT,
-                                        "Seu PIN de download da GTSTORE é: *$currentPin*\n\n⚠️ Você tem 10 minutos para iniciar o download antes que o código expire."
-                                    )
-                                }
-                                context.startActivity(Intent.createChooser(sendIntent, "Enviar PIN"))
-                            } else {
-                                Toast.makeText(context, "Gere um PIN primeiro!", Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("ENVIAR NO WHATSAPP")
-                    }
-                }
-            }
-        }
-
-        item {
             Text(
-                text = "PINs Recentes",
-                style = MaterialTheme.typography.titleMedium
+                text = "Quando o usuário clicar em 'SOLICITAR PIN' no PS4, a solicitação com o PIN exclusivo aparecerá aqui abaixo para você enviar no WhatsApp.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.Gray
             )
         }
 
-        if (activePins.isEmpty()) {
+        if (pinRequests.isEmpty()) {
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        text = "Nenhum PIN gerado recentemente.",
-                        modifier = Modifier.padding(16.dp)
+                        text = "Aguardando solicitações do PS4...",
+                        modifier = Modifier.padding(20.dp),
+                        color = Color.LightGray
                     )
                 }
             }
         } else {
             items(
-                items = activePins,
-                key = { it.pin }
-            ) { entry ->
+                items = pinRequests,
+                key = { it.id }
+            ) { req ->
                 Card(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Column {
+                        Text(
+                            text = req.gameTitle,
+                            style = MaterialTheme.typography.titleLarge
+                        )
+
+                        Text(
+                            text = "Código do Jogo: ${req.gameKey}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF0088F0)
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
                             Text(
-                                text = "PIN: ${entry.pin}",
+                                text = "PIN: ${req.pin}",
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = if (req.isExpired) Color(0xFFFF453A) else Color(0xFF35C759)
+                            )
+
+                            val elapsed = System.currentTimeMillis() - req.createdAt
+                            val remaining = ((PIN_TIMEOUT_MS - elapsed) / 1000L).coerceAtLeast(0L)
+
+                            Text(
+                                text = if (req.isExpired) "EXPIRADO" else "${remaining / 60}m ${remaining % 60}s",
+                                color = if (req.isExpired) Color(0xFFFF453A) else Color(0xFFFF9F0A),
                                 style = MaterialTheme.typography.titleMedium
                             )
-                            val elapsed: Long = System.currentTimeMillis() - entry.createdAt
-                            val remainingSeconds: Long = ((600_000L - elapsed) / 1000L).coerceAtLeast(0L)
-                            Text(
-                                text = if (entry.isExpired) "Status: Expirado" else "Expira em: ${remainingSeconds / 60}m ${remainingSeconds % 60}s",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (entry.isExpired) Color(0xFFFF453A) else Color(0xFF35C759)
-                            )
+                        }
+
+                        // 3: BOTÃO PARA ENCAMINHAR DIRETO PARA O WHATSAPP
+                        Button(
+                            onClick = {
+                                val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(
+                                        Intent.EXTRA_TEXT,
+                                        "Seu PIN de download para o jogo *${req.gameTitle}* (${req.gameKey}) na GTSTORE é: *${req.pin}*\n\n⚠️ Você tem 10 minutos para iniciar o download antes que o código expire."
+                                    )
+                                }
+                                context.startActivity(Intent.createChooser(sendIntent, "Enviar PIN no WhatsApp"))
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("ENVIAR NO WHATSAPP")
+                        }
+
+                        Button(
+                            onClick = {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                clipboard.setPrimaryClip(ClipData.newPlainText("PIN PS4", req.pin))
+                                Toast.makeText(context, "PIN ${req.pin} copiado!", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("COPIAR PIN")
                         }
                     }
                 }
