@@ -69,7 +69,7 @@ class HttpServer(
     fun generateAdminPin(): String {
         val pin = (100000..999999).random().toString()
         generatedPins[pin] = PinEntry(pin)
-        dbg("PIN de 10 min gerado pelo Admin: $pin")
+        dbg("PIN gerado pelo Admin: $pin (válido por 10 min)")
         return pin
     }
 
@@ -281,7 +281,7 @@ class HttpServer(
 
             if (entry.isExpired) {
                 generatedPins.remove(pin)
-                sendJson(output, 200, JSONObject().put("valid", false).put("message", "Este PIN expirou! O prazo de 10 minutos foi encerrado."))
+                sendJson(output, 200, JSONObject().put("valid", false).put("message", "Este PIN expirou! O prazo de 10 minutos encerrou."))
                 return
             }
 
