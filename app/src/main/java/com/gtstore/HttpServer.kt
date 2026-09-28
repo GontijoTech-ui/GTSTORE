@@ -213,13 +213,12 @@ class HttpServer(
         when (path) {
             "/api/send-payload" -> handleSendPayload(body, output)
             "/api/install" -> handleRemoteInstall(body, output)
-            // --- NOVO: Endpoint para o fluxo DPI (payload que faz callback) ---
             "/api/install-dpi" -> handleDirectInstallDpi(body, output)
             else -> sendError(output, 404, "POST endpoint not found")
         }
     }
 
-    // --- NOVO: Lógica completa do Direct Package Installer (Patch do payload + Callback) ---
+    // --- Lógica do Direct Package Installer com RASTREIO DE ERROS ---
     private fun handleDirectInstallDpi(body: ByteArray, output: OutputStream) {
         try {
             val json = JSONObject(String(body, StandardCharsets.UTF_8))
@@ -227,67 +226,70 @@ class HttpServer(
             val pkgId = json.optInt("pkgId", -1)
 
             if (!isValidIp(ps4Ip) || pkgId == -1) {
-                sendJsonError(output, 400, "IP da PS4 ou ID do PKG inválido.")
+                sendJsonError(output, 400, "[PASSO 1] IP do PS4 ou ID do PKG inválido.")
                 return
             }
 
             val packageInfo = getPackages().firstOrNull { it.id == pkgId }
             if (packageInfo == null) {
-                sendJsonError(output, 404, "Pacote não encontrado.")
+                sendJsonError(output, 404, "[PASSO 2] Pacote não encontrado na lista.")
                 return
             }
 
-            // Lê o ficheiro binário do assets (o teu deve ser o payload.bin original do DPI)
             val payloadTemplate = loadPayload("payload.bin") ?: loadPayload("direct-installer.bin")
             if (payloadTemplate == null) {
-                sendJsonError(output, 500, "Ficheiro payload do DPI não encontrado em assets.")
+                sendJsonError(output, 500, "[PASSO 3] Ficheiro payload.bin não encontrado na pasta assets/payloads.")
                 return
             }
 
             val payload = payloadTemplate.copyOf()
-            // Procura o marcador 0xB4 onde vamos injetar o IP do Android
             val off = indexOf(payload, byteArrayOf(0xB4.toByte(), 0xB4.toByte(), 0xB4.toByte(), 0xB4.toByte(), 0xB4.toByte(), 0xB4.toByte()))
             if (off < 0) {
-                sendJsonError(output, 500, "Marcador do payload não encontrado.")
+                sendJsonError(output, 500, "[PASSO 4] Marcador B4 não encontrado. O payload.bin não é o correto do DPI.")
                 return
             }
 
             val localIp = localAddress
+            if (localIp == "0.0.0.0" || localIp.isEmpty()) {
+                sendJsonError(output, 500, "[PASSO 5] O telemóvel não conseguiu ler o seu próprio IP. (Desligue os dados móveis 4G/5G).")
+                return
+            }
+
             val manifestUrl = "http://$localIp:$port/json/${packageInfo.id}.json"
             val localAddr = java.net.InetAddress.getByName(localIp)
 
-            // Abre o socket local e espera o PS4 ligar de volta para pedir as instruções
-            ServerSocket(0, 5, localAddr).use { tempServer ->
-                tempServer.soTimeout = 15_000
-                val callbackPort = tempServer.localPort
+            try {
+                ServerSocket(0, 5, localAddr).use { tempServer ->
+                    tempServer.soTimeout = 15_000 // Aguarda 15 segundos pelo PS4
+                    val callbackPort = tempServer.localPort
 
-                // Injeta o IP e a Porta no Payload
-                localAddr.address.copyInto(payload, off)
-                payload[off + 4] = (callbackPort ushr 8).toByte()
-                payload[off + 5] = callbackPort.toByte()
+                    localAddr.address.copyInto(payload, off)
+                    payload[off + 4] = (callbackPort ushr 8).toByte()
+                    payload[off + 5] = callbackPort.toByte()
 
-                // Envia para o BinLoader (porta 9090)
-                val binResult = sendPayloadToBinLoader(ps4Ip, payload)
-                if (!binResult.success) {
-                    sendJsonError(output, 502, "Falha no BinLoader: ${binResult.error}")
-                    return
-                }
-
-                // O PS4 recebeu o payload, agora deve conectar na nossa porta temporária
-                try {
-                    tempServer.accept().use { ps4Client ->
-                        ps4Client.getOutputStream().apply {
-                            write(buildDpiInfo(manifestUrl, packageInfo))
-                            flush()
-                        }
+                    val binResult = sendPayloadToBinLoader(ps4Ip, payload)
+                    if (!binResult.success) {
+                        sendJsonError(output, 502, "[PASSO 6] Falha ao enviar para o BinLoader (Porta 9090). O BinLoader está ativo no GoldHEN?\nDetalhe técnico: ${binResult.error}")
+                        return
                     }
-                    sendJson(output, 200, JSONObject().put("success", true).put("message", "Instalação DPI iniciada no PS4!"))
-                } catch (e: Exception) {
-                    sendJsonError(output, 504, "PS4 não respondeu ao callback: ${e.message}")
+
+                    try {
+                        tempServer.accept().use { ps4Client ->
+                            ps4Client.getOutputStream().apply {
+                                write(buildDpiInfo(manifestUrl, packageInfo))
+                                flush()
+                            }
+                        }
+                        sendJson(output, 200, JSONObject().put("success", true).put("message", "Instalação DPI iniciada no PS4!"))
+                    } catch (e: Exception) {
+                        sendJsonError(output, 504, "[PASSO 7] Timeout: O PS4 recebeu o payload, mas não ligou de volta ao telemóvel (Porta $callbackPort).\nDetalhe técnico: ${e.message}")
+                    }
                 }
+            } catch (e: Exception) {
+                sendJsonError(output, 500, "[PASSO 8] Falha ao abrir a porta de escuta no telemóvel.\nDetalhe técnico: ${e.message}")
             }
         } catch (e: Exception) {
-            sendJsonError(output, 400, "Erro ao processar pedido DPI: ${e.message}")
+            sendJsonError(output, 400, "[PASSO 9] Erro geral de execução.\nDetalhe técnico: ${e.javaClass.simpleName} - ${e.message}")
         }
     }
 
@@ -296,13 +298,13 @@ class HttpServer(
         fun i32(v: Int) = out.write(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(v).array())
         fun str(s: String) { val b = s.toByteArray(StandardCharsets.UTF_8); i32(b.size); out.write(b) }
 
-        i32(1) // 1 = novo pacote
+        i32(1)
         str(url)
-        str(info.name.substringBeforeLast(".")) // Título
-        str("UP0000-CUSA00000_00-0000000000000000") // ContentID genérico para iniciar download
-        str("PS4GD") // BGFT Type (Game)
+        str(info.name.substringBeforeLast("."))
+        str("UP0000-CUSA00000_00-0000000000000000")
+        str("PS4GD")
         out.write(ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN).putLong(info.size).array())
-        i32(0) // Sem ícone
+        i32(0)
         return out.toByteArray()
     }
 
@@ -316,10 +318,8 @@ class HttpServer(
         }
         return -1
     }
-    // --------------------------------------------------------------------------------------
 
     private fun handleSendPayload(body: ByteArray, output: OutputStream) {
-        // [Código original mantido intacto...]
         try {
             val json = JSONObject(String(body, StandardCharsets.UTF_8))
             val ip = json.optString("ip").trim()
@@ -390,7 +390,6 @@ class HttpServer(
     }
 
     private fun handleRemoteInstall(body: ByteArray, output: OutputStream) {
-        // [Código original mantido intacto...]
         try {
             val json = JSONObject(String(body, StandardCharsets.UTF_8))
             val ip = json.optString("ip").trim()
@@ -419,7 +418,6 @@ class HttpServer(
     private data class InstallResult(val success: Boolean, val response: String = "", val error: String? = null)
 
     private fun sendInstallRequestToPs4(ip: String, pkgUrl: String): InstallResult {
-        // [Código original mantido intacto...]
         return try {
             Socket().use { socket ->
                 socket.soTimeout = 8000
@@ -452,7 +450,6 @@ class HttpServer(
     }
 
     private fun readHttpResponse(input: InputStream): Pair<Int, String> {
-        // [Código original mantido intacto...]
         val headerBuffer = ByteArrayOutputStream()
         val marker = byteArrayOf('\r'.code.toByte(), '\n'.code.toByte(), '\r'.code.toByte(), '\n'.code.toByte())
         var matched = 0
@@ -510,7 +507,6 @@ class HttpServer(
             path == "/" || path == "/ps4" -> sendHomePage(output, headOnly)
             path == "/api/status" -> sendStatusJson(output, headOnly, clientIp)
             path == "/api/packages" -> sendPackagesJson(output, headOnly)
-            // --- NOVO: Endpoint JSON do Manifesto exigido pelo PS4 para transferir ficheiros gigantes ---
             path.startsWith("/json/") -> {
                 val id = path.removePrefix("/json/").removeSuffix(".json").toIntOrNull()
                 if (id != null) sendManifestJson(id, output, headOnly) else sendError(output, 404, "Not Found")
@@ -536,7 +532,6 @@ class HttpServer(
         }
     }
 
-    // --- NOVO: Gera dinamicamente o Manifesto JSON ---
     private fun sendManifestJson(packageId: Int, output: OutputStream, headOnly: Boolean) {
         val packageInfo = getPackages().firstOrNull { it.id == packageId }
         if (packageInfo == null) {
@@ -620,8 +615,7 @@ class HttpServer(
         val statusText = if (partial) "Partial Content" else "OK"
 
         val responseHeaders = LinkedHashMap<String, String>()
-        // PS4 lida melhor com Accept-Ranges: none para não se confundir nos chunks
-        responseHeaders["Accept-Ranges"] = "none" 
+        responseHeaders["Accept-Ranges"] = "none"
         responseHeaders["Content-Length"] = contentLength.toString()
         responseHeaders["Content-Type"] = "application/octet-stream"
         responseHeaders["Content-Disposition"] = "attachment; filename=\"${sanitizeFileName(packageInfo.fileName)}\""
@@ -640,13 +634,10 @@ class HttpServer(
             return
         }
 
-        // --- NOVO: Correção crítica para ficheiros grandes (Resolve falhas e timeouts do PS4) ---
         try {
-            // Em vez de usar openInputStream e ler byte a byte com o lento 'skipFully',
-            // pedimos ao sistema operativo um FileDescriptor e saltamos imediatamente para a posição.
             context.contentResolver.openFileDescriptor(packageInfo.uri, "r")?.use { pfd ->
                 FileInputStream(pfd.fileDescriptor).use { fis ->
-                    fis.channel.position(start) // Salto instantâneo!
+                    fis.channel.position(start)
                     streamRange(fis, output, contentLength)
                 }
             }
@@ -669,7 +660,6 @@ class HttpServer(
         }
     }
 
-    // (O método skipFully continua aqui caso precises no futuro, mas o servePackage já não o usa)
     private fun skipFully(input: InputStream, bytes: Long) {
         var remaining = bytes
         while (remaining > 0) {
@@ -685,7 +675,6 @@ class HttpServer(
     }
 
     private fun getPackages(): List<PackageInfo> {
-        // [Código original mantido intacto...]
         val preferences = context.getSharedPreferences("GTSTORE", Context.MODE_PRIVATE)
         val savedUri = preferences.getString("pkg_folder_uri", null)
             ?: context.getSharedPreferences("GTSTORE_PREFS", Context.MODE_PRIVATE)
@@ -747,7 +736,7 @@ class HttpServer(
             .put("online", status.running).put("running", status.running).put("port", status.port)
             .put("address", status.localAddress).put("localAddress", status.localAddress)
             .put("url", status.url).put("activeConnections", status.activeConnections)
-            .put("clientIp", clientIp) 
+            .put("clientIp", clientIp)
             
         val body = json.toString().toByteArray(StandardCharsets.UTF_8)
         sendResponse(output, 200, "OK", "application/json; charset=utf-8", body, headOnly, mapOf("Cache-Control" to "no-cache", "Access-Control-Allow-Origin" to "*"))
