@@ -105,7 +105,7 @@
             z-index: 5;
         }
 
-        /* PÁGINA DE DETALHES DO JOGO (SEPARADA) */
+        /* PÁGINA DE DETALHES DO JOGO */
         .view-details {
             display: none; background: #0a0a0a; border: 1px solid var(--border);
             border-radius: 14px; padding: 24px; margin-top: 10px;
@@ -133,7 +133,7 @@
         .btn-install-upd { background: #2f5379; }
         .btn-install-dlc { background: #633994; }
 
-        /* MODAIS (PIN & DLCS) */
+        /* MODAIS */
         .overlay {
             position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
             padding: 20px; background: rgba(0, 0, 0, 0.92); z-index: 1000;
@@ -149,7 +149,8 @@
 
         .whatsapp-box {
             background: #182c1e; border: 1px solid #35c759; color: #4cd964;
-            padding: 12px; border-radius: 8px; font-weight: bold; font-size: 15px; margin: 15px 0;
+            padding: 12px; border-radius: 8px; font-weight: bold; font-size: 16px; margin: 15px 0;
+            letter-spacing: 0.5px;
         }
 
         .pin-input {
@@ -199,7 +200,7 @@
         </section>
     </div>
 
-    <!-- TELA 2: DETALHES DO JOGO (COM BOTÕES DE DOWNLOAD) -->
+    <!-- TELA 2: DETALHES DO JOGO -->
     <div id="view-details" class="view-details">
         <button id="btn-back" class="btn-back" type="button">← VOLTAR AO CATÁLOGO</button>
         <div class="details-layout">
@@ -207,9 +208,7 @@
             <div class="details-info">
                 <h1 id="detail-title" class="details-title">Título do Jogo</h1>
                 <p id="detail-id" class="details-id">CUSA00000</p>
-                <div class="details-actions" id="detail-actions">
-                    <!-- Botões de instalação inseridos dinamicamente aqui -->
-                </div>
+                <div class="details-actions" id="detail-actions"></div>
             </div>
         </div>
     </div>
@@ -221,9 +220,8 @@
         <h2>Acesso Protegido</h2>
         <p>Para desbloquear a página de downloads deste jogo, solicite seu PIN de 6 dígitos via WhatsApp:</p>
 
-        <!-- SEU NÚMERO DO WHATSAPP AQUI -->
         <div class="whatsapp-box" id="whatsapp-display">
-            WhatsApp: (XX) 9XXXX-XXXX
+            WhatsApp: (64) 99225-9727
         </div>
 
         <button id="btn-req-pin" class="btn-sec btn-sec-primary" type="button" style="width: 100%;">
@@ -240,7 +238,7 @@
     </div>
 </div>
 
-<!-- MODAL DE SELEÇÃO DE DLC / UPDATES -->
+<!-- MODAL DE DLC / UPDATES -->
 <div id="dlc-overlay" class="overlay">
     <div class="modal" style="max-width: 600px; text-align: left;">
         <h2 id="dlc-modal-title">Pacotes</h2>
@@ -252,8 +250,7 @@
 <script>
 "use strict";
 
-// CONFIGURE SEU NÚMERO DE WHATSAPP AQUI:
-const WHATSAPP_CONTATO = "(31) 99999-9999";
+const WHATSAPP_CONTATO = "(64) 99225-9727";
 
 let allPackages = [];
 let games = [];
@@ -346,7 +343,6 @@ function buildCatalog(packages) {
     return result;
 }
 
-// RENDERIZA A PÁGINA INICIAL (APENAS BOTÃO ACESSAR)
 function renderCatalog() {
     const container = document.getElementById("catalog");
     const query = document.getElementById("search").value.trim().toLowerCase();
@@ -400,7 +396,6 @@ function renderCatalog() {
     }
 }
 
-// FLUXO DO PIN
 function openPinModal(game) {
     selectedGame = game;
     document.getElementById("pin-input").value = "";
@@ -455,14 +450,13 @@ async function verifyPin() {
             closePinModal();
             showGameDetails(selectedGame);
         } else {
-            showNotice(data.message || "PIN inválido.", "error");
+            showNotice(data.message || "PIN incorreto ou não liberado.", "error");
         }
     } catch (_) {
         showNotice("Erro ao validar PIN com o servidor.", "error");
     }
 }
 
-// EXIBE A PÁGINA SEPARADA DE DETALHES COM OS BOTÕES DE INSTALAÇÃO
 function showGameDetails(game) {
     document.getElementById("view-catalog").style.display = "none";
     const detailsView = document.getElementById("view-details");
@@ -509,7 +503,6 @@ function backToCatalog() {
     selectedGame = null;
 }
 
-// DISPARO DO INSTALADOR DPI
 async function triggerInstall(pkg, button) {
     if (!isServerOnline) {
         showNotice("Servidor Offline! Verifique a conexão do aplicativo.", "error");
