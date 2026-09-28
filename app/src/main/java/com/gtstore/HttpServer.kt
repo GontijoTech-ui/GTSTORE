@@ -327,7 +327,7 @@ class HttpServer(
                             405,
                             "Method Not Allowed",
                             mapOf(
-                                "Allow" ->
+                                "Allow" to
                                     "GET, HEAD, POST, OPTIONS"
                             )
                         )
@@ -1507,26 +1507,6 @@ class HttpServer(
         )
     }
 
-    /**
-     * ============================================================
-     * TRANSFERÊNCIA DO PKG
-     *
-     * Esta parte mantém o fluxo validado:
-     *
-     * Range: bytes=start-end
-     *       ↓
-     * HTTP 206
-     *       ↓
-     * Content-Range
-     *       ↓
-     * FileChannel.position(start)
-     *       ↓
-     * streamRange()
-     *
-     * Não usamos Int para offsets/tamanho.
-     * Tudo permanece Long.
-     * ============================================================
-     */
     private fun servePackage(
         packageId: Int,
         headers: Map<String, String>,
@@ -1715,8 +1695,6 @@ class HttpServer(
         val responseHeaders =
             LinkedHashMap<String, String>()
 
-        // CORREÇÃO IMPORTANTE:
-        // o servidor suporta Range.
         responseHeaders["Accept-Ranges"] = "bytes"
 
         responseHeaders["Content-Length"] =
@@ -1851,10 +1829,6 @@ class HttpServer(
 
         return bytesToSend - remaining
     }
-
-    // ============================================================
-    // CACHE DOS PKGS
-    // ============================================================
 
     @Volatile
     private var pkgCache: List<PackageInfo> =
@@ -2026,28 +2000,6 @@ class HttpServer(
         }
     }
 
-    /**
-     * ============================================================
-     * API DO CATÁLOGO
-     *
-     * IMPORTANTE:
-     * O catálogo NÃO classifica pelo nome do arquivo.
-     *
-     * A fonte é:
-     *
-     * PKG
-     *  └── param.sfo
-     *       ├── TITLE
-     *       ├── CONTENT_ID
-     *       └── CATEGORY
-     *
-     * CATEGORY:
-     * gd -> GAME
-     * gp -> UPDATE
-     * ac -> DLC
-     * outro -> OTHER
-     * ============================================================
-     */
     private fun sendPackagesJson(
         output: OutputStream,
         headOnly: Boolean
@@ -2491,13 +2443,13 @@ class HttpServer(
             416,
             "Range Not Satisfiable",
             mapOf(
-                "Content-Range" ->
+                "Content-Range" to
                         "bytes */$totalSize",
 
-                "Accept-Ranges" ->
+                "Accept-Ranges" to
                         "bytes",
 
-                "Access-Control-Allow-Origin" ->
+                "Access-Control-Allow-Origin" to
                         "*"
             )
         )
