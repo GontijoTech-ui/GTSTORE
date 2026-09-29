@@ -1,4 +1,4 @@
-name: Build GTSTORE
+name: Build e Assinar GTSTORE
 
 on:
   workflow_dispatch:
@@ -26,15 +26,33 @@ jobs:
       - name: Dar permissão ao Gradle
         run: chmod +x gradlew
 
-      - name: Compilar APK
-        run: ./gradlew assembleDebug
+      - name: Compilar APK (Release)
+        run: ./gradlew assembleRelease
 
-      - name: Disponibilizar APK
+      - name: Restaurar chave (.jks)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > gtstore-release.jks
+
+      - name: Assinar APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -V | tail -n 1)
+          UNSIGNED_APK=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          
+          $APKSIGNER sign \
+            --ks gtstore-release.jks \
+            --ks-key-alias gtstore \
+            --ks-pass env:KEYSTORE_PASSWORD \
+            --key-pass env:KEYSTORE_PASSWORD \
+            --out app/build/outputs/apk/release/GTSTORE-release.apk \
+            "$UNSIGNED_APK"
+
+      - name: Disponibilizar APK Assinado
         uses: actions/upload-artifact@v4
         with:
-          name: GTSTORE-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: GTSTORE-Release
+          path: app/build/outputs/apk/release/GTSTORE-release.apk
           if-no-files-found: error
-
-
-
