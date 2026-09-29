@@ -37,8 +37,12 @@
             max-height: 120px; object-fit: contain; margin: 0 auto 12px; border-radius: 12px;
         }
 
+        .header-controls {
+            display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px; margin-top: 6px;
+        }
+
         .server-status {
-            display: inline-flex; align-items: center; gap: 8px; margin-top: 6px;
+            display: inline-flex; align-items: center; gap: 8px;
             padding: 6px 14px; border-radius: 20px; background: #141414;
             border: 1px solid #222; color: var(--muted); font-size: 12px;
         }
@@ -46,6 +50,24 @@
         .status-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--orange); }
         .status-online .status-dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
         .status-offline .status-dot { background: var(--red); box-shadow: 0 0 8px var(--red); }
+
+        /* BARRA DO IP DO PS4 */
+        .ps4-ip-bar {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 4px 12px; border-radius: 20px; background: #141414;
+            border: 1px solid var(--border); font-size: 12px;
+        }
+        .ps4-ip-label { font-weight: bold; color: var(--muted); }
+        .ps4-ip-input {
+            width: 135px; background: #000; border: 1px solid #333; border-radius: 6px;
+            color: #fff; font-size: 13px; font-weight: bold; text-align: center; padding: 4px 6px; outline: none;
+        }
+        .ps4-ip-input:focus { border-color: var(--primary); box-shadow: 0 0 8px rgba(0, 112, 204, 0.6); }
+        .btn-save-ip {
+            border: 0; border-radius: 6px; padding: 5px 12px; background: var(--primary);
+            color: #fff; font-size: 11px; font-weight: bold; cursor: pointer; outline: none;
+        }
+        .btn-save-ip:hover { background: var(--primary-hover); }
 
         .container { width: 95%; max-width: 1400px; margin: 0 auto; padding: 24px 0 60px; }
         .toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 24px; }
@@ -95,6 +117,7 @@
         .btn-access:focus, .btn-access:hover,
         .btn-install:focus, .btn-install:hover,
         .btn-sec:focus, .btn-sec:hover,
+        .btn-save-ip:focus, .btn-save-ip:hover,
         .refresh:focus, .refresh:hover {
             outline: 3px solid #ffffff !important;
             box-shadow: 0 0 14px rgba(255, 255, 255, 0.9) !important;
@@ -186,9 +209,16 @@
 
 <header class="header">
     <img class="logo" src="/logo.jpg" alt="Logo" onerror="this.style.display='none';">
-    <div id="server-status" class="server-status">
-        <span class="status-dot"></span>
-        <span id="server-status-text">A verificar servidor...</span>
+    <div class="header-controls">
+        <div id="server-status" class="server-status">
+            <span class="status-dot"></span>
+            <span id="server-status-text">A verificar servidor...</span>
+        </div>
+        <div class="ps4-ip-bar">
+            <span class="ps4-ip-label">🎮 IP PS4:</span>
+            <input id="ps4-ip" class="ps4-ip-input" type="text" placeholder="192.168.0.X" autocomplete="off">
+            <button id="btn-save-ip" class="btn-save-ip" type="button">SALVAR</button>
+        </div>
     </div>
 </header>
 
@@ -218,18 +248,15 @@
     </div>
 </main>
 
-<!-- MODAL DE PIN & WHATSAPP COM SOLICITAÇÃO -->
 <div id="pin-overlay" class="overlay">
     <div class="modal">
         <h2>Acesso Protegido</h2>
         <p id="pin-modal-game-info" style="color: #0088f0; font-weight: bold; margin-bottom: 12px;"></p>
 
-        <!-- 1: BOTÃO DE SOLICITAR PIN DE VOLTA -->
         <button id="btn-req-pin" class="btn-sec btn-sec-primary" type="button" style="width: 100%; margin-bottom: 12px;">
             SOLICITAR PIN
         </button>
 
-        <!-- 2: MENSAGEM ANTES DO QR CODE -->
         <p style="font-weight: bold; color: #35c759; margin: 10px 0 6px; font-size: 14px;">
             Chame no WhatsApp após solicitar o PIN:
         </p>
@@ -281,6 +308,29 @@ function formatSize(bytes) {
     return (value / (1024 * 1024 * 1024)).toFixed(2) + " GB";
 }
 
+function initPs4Ip() {
+    const saved = localStorage.getItem("ps4_ip") || "";
+    if (saved) {
+        document.getElementById("ps4-ip").value = saved;
+    }
+}
+
+function savePs4Ip() {
+    const ip = document.getElementById("ps4-ip").value.trim();
+    if (!ip) {
+        showNotice("Informe o IP do PS4 (ex: 192.168.0.15).", "error");
+        return;
+    }
+    localStorage.setItem("ps4_ip", ip);
+    showNotice("✓ IP do PS4 salvo: " + ip, "success");
+}
+
+function getTargetIp() {
+    const fromInput = document.getElementById("ps4-ip").value.trim();
+    const fromStorage = localStorage.getItem("ps4_ip") || "";
+    return fromInput || fromStorage || ps4ClientIp;
+}
+
 async function checkStatus() {
     const badge = document.getElementById("server-status");
     const text = document.getElementById("server-status-text");
@@ -298,6 +348,13 @@ async function checkStatus() {
         const ip = data.localAddress || "";
         ps4ClientIp = data.clientIp || "";
         text.textContent = "Servidor Online — " + (ip ? ip + ":" + data.port : "Porta " + data.port);
+
+        // Se o usuário ainda não tiver configurado IP e o clientIp parecer da rede local, preenche automaticamente
+        const ipInput = document.getElementById("ps4-ip");
+        if (!localStorage.getItem("ps4_ip") && !ipInput.value && ps4ClientIp && ps4ClientIp.startsWith("192.168.")) {
+            ipInput.value = ps4ClientIp;
+            localStorage.setItem("ps4_ip", ps4ClientIp);
+        }
     } catch (_) {
         clearTimeout(timeoutId);
         isServerOnline = false;
@@ -529,16 +586,24 @@ async function triggerInstall(pkg, button) {
         showNotice("Servidor Offline! Verifique o app no celular.", "error");
         return;
     }
+
+    const targetIp = getTargetIp();
+    if (!targetIp) {
+        showNotice("Por favor, digite o IP do seu PS4 na barra no topo antes de instalar!", "error");
+        document.getElementById("ps4-ip").focus();
+        return;
+    }
+
     button.disabled = true;
     const original = button.textContent;
     button.textContent = "ENVIANDO AO PS4...";
-    showNotice("Enviando payload para a porta 9090 do console...");
+    showNotice("Enviando comando para o PS4 (" + targetIp + ")...");
 
     try {
         const res = await fetch("/api/install-dpi", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ pkgId: pkg.id, ip: ps4ClientIp })
+            body: JSON.stringify({ pkgId: pkg.id, ip: targetIp })
         });
         const data = await res.json();
         if (data.success) {
@@ -602,8 +667,11 @@ document.getElementById("btn-req-pin").addEventListener("click", requestPin);
 document.getElementById("btn-cancel-pin").addEventListener("click", closePinModal);
 document.getElementById("btn-confirm-pin").addEventListener("click", verifyPin);
 document.getElementById("dlc-close").addEventListener("click", () => document.getElementById("dlc-overlay").classList.remove("visible"));
+document.getElementById("btn-save-ip").addEventListener("click", savePs4Ip);
+document.getElementById("ps4-ip").addEventListener("change", savePs4Ip);
 
 document.addEventListener("DOMContentLoaded", async () => {
+    initPs4Ip();
     await checkStatus();
     await loadPackages();
     setInterval(checkStatus, 4000);
