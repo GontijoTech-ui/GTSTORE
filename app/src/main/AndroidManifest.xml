@@ -9,6 +9,8 @@
     <application
         android:name=".GTStoreApplication"
         android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:label="GTSTORE"
         android:supportsRtl="true"
         android:usesCleartextTraffic="true">
