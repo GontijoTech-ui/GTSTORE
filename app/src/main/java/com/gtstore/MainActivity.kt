@@ -313,7 +313,7 @@ fun Dashboard(
             }
         }
 
-        // APENAS OS CARTÕES ESSENCIAIS
+        // CARTÕES ESSENCIAIS COM STATUS LED
         item {
             StatusCardLed(
                 title = "SERVIDOR",
@@ -716,34 +716,91 @@ fun AdminScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        // CABEÇALHO PADRONIZADO
         item {
             Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "SOLICITAÇÕES DE PIN",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextWhite
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(vertical = 8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(14.dp)
+                        .clip(CircleShape)
+                        .background(RedAccent)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "SOLICITAÇÕES DE PIN",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextWhite
+                )
+            }
         }
 
+        // CARD DE STATUS GERAL
         item {
-            Text(
-                text = "Quando o usuário clica em 'SOLICITAR PIN' no PS4, a chave exclusiva é gerada aqui para envio no WhatsApp.",
-                fontSize = 14.sp,
-                color = TextMuted,
-                lineHeight = 20.sp
-            )
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = CardBlack),
+                border = BorderStroke(1.dp, BorderDark),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(if (pinRequests.isNotEmpty()) GreenLed else RedLed)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (pinRequests.isNotEmpty()) "FILA ATIVA" else "AGUARDANDO SOLICITAÇÕES",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (pinRequests.isNotEmpty()) GreenLed else TextMuted
+                        )
+                    }
+
+                    Text(
+                        text = "Solicitações pendentes: ${pinRequests.size}",
+                        color = TextWhite,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Text(
+                        text = "Validade de cada chave: 10 minutos",
+                        color = TextMuted,
+                        fontSize = 13.sp
+                    )
+
+                    Text(
+                        text = "Quando o usuário clica em 'SOLICITAR PIN' no PS4, a chave aparece abaixo.",
+                        color = TextMuted,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp
+                    )
+                }
+            }
         }
 
+        // LISTA DE SOLICITAÇÕES
         if (pinRequests.isEmpty()) {
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = CardBlack),
-                    border = BorderStroke(1.dp, BorderDark)
+                    border = BorderStroke(1.dp, BorderDark),
+                    shape = RoundedCornerShape(10.dp)
                 ) {
                     Text(
-                        text = "Nenhuma solicitação pendente no momento...",
+                        text = "Nenhuma solicitação no momento...",
                         modifier = Modifier.padding(20.dp),
                         color = TextMuted,
                         fontSize = 15.sp
@@ -755,83 +812,143 @@ fun AdminScreen(
                 items = pinRequests,
                 key = { it.id }
             ) { req ->
+                val elapsed = System.currentTimeMillis() - req.createdAt
+                val remaining = ((HttpServer.PIN_TIMEOUT_MS - elapsed) / 1000L).coerceAtLeast(0L)
+
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = CardBlack),
-                    border = BorderStroke(1.dp, BorderDark)
+                    border = BorderStroke(1.dp, if (req.isExpired) BorderDark else Color(0xFF331114)),
+                    shape = RoundedCornerShape(10.dp)
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier.padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text(
-                            text = req.gameTitle,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextWhite
-                        )
-
-                        Text(
-                            text = "Código: ${req.gameKey}",
-                            fontSize = 14.sp,
-                            color = Color(0xFF0088F0)
-                        )
-
+                        // Título do jogo + Contador LED
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "PIN: ${req.pin}",
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Black,
-                                color = if (req.isExpired) RedLed else GreenLed
+                                text = req.gameTitle,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextWhite,
+                                modifier = Modifier.weight(1f)
                             )
 
-                            val elapsed = System.currentTimeMillis() - req.createdAt
-                            val remaining = ((HttpServer.PIN_TIMEOUT_MS - elapsed) / 1000L).coerceAtLeast(0L)
-
-                            Text(
-                                text = if (req.isExpired) "EXPIRADO" else "${remaining / 60}m ${remaining % 60}s",
-                                color = if (req.isExpired) RedLed else Color(0xFFFF9F0A),
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(if (req.isExpired) RedLed else GreenLed)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (req.isExpired) "EXPIRADO" else "${remaining / 60}m ${remaining % 60}s",
+                                    color = if (req.isExpired) RedLed else Color(0xFFFF9F0A),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
 
-                        Button(
-                            onClick = {
-                                val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(
-                                        Intent.EXTRA_TEXT,
-                                        "Seu PIN de download para *${req.gameTitle}* (${req.gameKey}) na GTSTORE é: *${req.pin}*\n\n⚠️ Válido por 10 minutos."
-                                    )
-                                }
-                                context.startActivity(Intent.createChooser(sendIntent, "Enviar PIN no WhatsApp"))
-                            },
+                        Text(
+                            text = "Código / CUSA: ${req.gameKey}",
+                            fontSize = 13.sp,
+                            color = Color(0xFF64B5F6),
+                            fontWeight = FontWeight.SemiBold
+                        )
+
+                        // DESTAQUE CENTRAL DO PIN
+                        Card(
                             modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = RedAccent)
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F0F0F)),
+                            border = BorderStroke(1.dp, BorderDark),
+                            shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("ENVIAR NO WHATSAPP", fontWeight = FontWeight.Bold)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "PIN:",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextMuted
+                                )
+                                Text(
+                                    text = req.pin,
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = 2.sp,
+                                    color = if (req.isExpired) RedLed else GreenLed
+                                )
+                            }
                         }
 
-                        Button(
-                            onClick = {
-                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                clipboard.setPrimaryClip(ClipData.newPlainText("PIN PS4", req.pin))
-                                Toast.makeText(context, "PIN copiado!", Toast.LENGTH_SHORT).show()
-                            },
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        // BOTÕES DE AÇÃO LADO A LADO
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF222222))
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text("COPIAR PIN")
+                            Button(
+                                onClick = {
+                                    val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(
+                                            Intent.EXTRA_TEXT,
+                                            "Seu PIN de download para o jogo *${req.gameTitle}* (${req.gameKey}) na GTSTORE é: *${req.pin}*\n\n⚠️ Válido por 10 minutos."
+                                        )
+                                    }
+                                    context.startActivity(Intent.createChooser(sendIntent, "Enviar PIN no WhatsApp"))
+                                },
+                                modifier = Modifier
+                                    .weight(1.3f)
+                                    .height(46.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = RedAccent),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = "WHATSAPP",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
+
+                            Button(
+                                onClick = {
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    clipboard.setPrimaryClip(ClipData.newPlainText("PIN PS4", req.pin))
+                                    Toast.makeText(context, "PIN copiado!", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(46.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF222222)),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = "COPIAR",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
                         }
                     }
                 }
             }
         }
 
+        // BOTÃO VOLTAR PADRÃO
         item {
             Button(
                 onClick = onBack,
@@ -841,8 +958,9 @@ fun AdminScreen(
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF141414)),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                Text("VOLTAR", color = TextWhite)
+                Text("VOLTAR", color = TextWhite, fontWeight = FontWeight.Bold)
             }
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
