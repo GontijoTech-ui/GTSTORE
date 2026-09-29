@@ -55,6 +55,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.documentfile.provider.DocumentFile
@@ -243,7 +244,6 @@ fun Dashboard(
         mutableStateOf(httpServer.isRunning())
     }
 
-    // Carrega a logo da raiz (assets)
     val logoBitmap = remember {
         try {
             context.assets.open("logo.jpg").use { inputStream ->
@@ -265,34 +265,55 @@ fun Dashboard(
         modifier = Modifier
             .fillMaxSize()
             .background(PureBlack)
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+            .padding(horizontal = 22.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // LOGO CENTRALIZADA NO TOPO
+        // RESPIRO SUPERIOR
         item {
-            if (logoBitmap != null) {
-                Image(
-                    bitmap = logoBitmap.asImageBitmap(),
-                    contentDescription = "GTSTORE Logo",
-                    modifier = Modifier
-                        .fillMaxWidth(0.75f)
-                        .height(110.dp)
-                        .padding(top = 10.dp, bottom = 4.dp),
-                    contentScale = ContentScale.Fit
-                )
-            } else {
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+
+        // LOGO E DESTAQUE GONTIJO TECH
+        item {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 10.dp)
+            ) {
+                if (logoBitmap != null) {
+                    Image(
+                        bitmap = logoBitmap.asImageBitmap(),
+                        contentDescription = "GTSTORE Logo",
+                        modifier = Modifier
+                            .fillMaxWidth(0.85f)
+                            .height(130.dp),
+                        contentScale = ContentScale.Fit
+                    )
+                } else {
+                    Text(
+                        text = "GTSTORE",
+                        fontSize = 36.sp,
+                        fontWeight = FontWeight.Black,
+                        color = RedAccent
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
                 Text(
-                    text = "GTSTORE",
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Black,
-                    color = RedAccent,
-                    modifier = Modifier.padding(vertical = 12.dp)
+                    text = "GONTIJO TECH",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 6.sp,
+                    color = Color(0xFFDDDDDD),
+                    textAlign = TextAlign.Center
                 )
             }
         }
 
-        // CARTOES DE STATUS COM BOLINHAS LED
+        // APENAS OS CARTÕES ESSENCIAIS
         item {
             StatusCardLed(
                 title = "SERVIDOR",
@@ -310,26 +331,10 @@ fun Dashboard(
         }
 
         item {
-            StatusCardSimple(
-                title = "CLOUDFLARE",
-                status = "Aguardando",
-                statusColor = TextMuted
-            )
+            Spacer(modifier = Modifier.height(4.dp))
         }
 
-        item {
-            StatusCardSimple(
-                title = "GITHUB",
-                status = "Aguardando",
-                statusColor = TextMuted
-            )
-        }
-
-        item {
-            Spacer(modifier = Modifier.height(6.dp))
-        }
-
-        // BOTOES RESTANTES COM ESTILO VERMELHO GT
+        // BOTÕES DE MENU
         item {
             RedMenuButton(text = "SERVIDOR", onClick = { onNavigate(GTStoreScreen.SERVIDOR) })
         }
@@ -340,6 +345,10 @@ fun Dashboard(
 
         item {
             RedMenuButton(text = "ADMIN (SOLICITAÇÕES PIN)", onClick = { onNavigate(GTStoreScreen.ADMIN) })
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
@@ -374,6 +383,7 @@ fun ServerScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
+            Spacer(modifier = Modifier.height(16.dp))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(vertical = 8.dp)
@@ -405,7 +415,6 @@ fun ServerScreen(
                     modifier = Modifier.padding(18.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // INDICADOR VISUAL COM BOLINHA
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -567,6 +576,7 @@ fun FilesScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
+            Spacer(modifier = Modifier.height(16.dp))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(vertical = 8.dp)
@@ -628,30 +638,41 @@ fun FilesScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    Row(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         Button(
                             onClick = { refreshCounter++ },
                             enabled = selectedFolderUri != null && !scanning,
                             modifier = Modifier
                                 .weight(1f)
-                                .height(48.dp),
+                                .height(46.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = RedAccent),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text(if (scanning) "LENDO..." else "ATUALIZAR", fontWeight = FontWeight.Bold)
+                            Text(
+                                text = if (scanning) "LENDO..." else "ATUALIZAR",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
                         }
-
-                        Spacer(modifier = Modifier.width(10.dp))
 
                         Button(
                             onClick = onSelectFolder,
                             modifier = Modifier
                                 .weight(1f)
-                                .height(48.dp),
+                                .height(46.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF222222)),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("ALTERAR PASTA", fontWeight = FontWeight.Bold)
+                            Text(
+                                text = "ALTERAR PASTA",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                softWrap = false
+                            )
                         }
                     }
 
@@ -696,6 +717,7 @@ fun AdminScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
+            Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = "SOLICITAÇÕES DE PIN",
                 fontSize = 22.sp,
@@ -825,7 +847,7 @@ fun AdminScreen(
     }
 }
 
-// COMPONENTES REUTILIZÁVEIS
+// COMPONENTES DE SUPORTE
 @Composable
 fun StatusCardLed(title: String, status: String, isOnline: Boolean) {
     Card(
